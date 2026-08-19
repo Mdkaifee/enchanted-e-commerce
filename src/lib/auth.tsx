@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(false);
   const [loading, setLoading] = useState(true);
+  const currentUserIdRef = useRef<string | null>(null);
+  const adminRoleCacheRef = useRef(new Map<string, boolean>());
 
   useEffect(() => {
     let active = true;
@@ -27,14 +37,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     getFreshSupabaseSession().then((nextSession) => {
       if (!active) return;
-      setIsAdmin(nextSession?.user ? null : false);
+      const userId = nextSession?.user.id ?? null;
+      currentUserIdRef.current = userId;
+      setIsAdmin(userId ? (adminRoleCacheRef.current.get(userId) ?? null) : false);
       setSession(nextSession);
       setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!active) return;
-      setIsAdmin(next?.user ? null : false);
+      const userId = next?.user.id ?? null;
+      const previousUserId = currentUserIdRef.current;
+      currentUserIdRef.current = userId;
+      setIsAdmin((current) => {
+        if (!userId) return false;
+        const cachedRole = adminRoleCacheRef.current.get(userId);
+        if (cachedRole !== undefined) return cachedRole;
+        return previousUserId === userId ? current : null;
+      });
       setSession(next);
     });
 
@@ -60,7 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("role", "admin")
       .maybeSingle()
       .then(({ data }) => {
-        if (active) setIsAdmin(Boolean(data));
+        const admin = Boolean(data);
+        adminRoleCacheRef.current.set(userId, admin);
+        if (active) setIsAdmin(admin);
       });
     return () => {
       active = false;
