@@ -10,6 +10,7 @@ import {
   categoryImage,
   formatPrice,
   productCategories,
+  productImage,
   productsQuery,
   type Product,
 } from "@/lib/catalog";
@@ -574,7 +575,7 @@ function productToForm(product: Product): ProductForm {
     colors: product.colors.join(", "),
     color_images: formatColorImages(product.color_images),
     sizes: product.sizes.join(", "),
-    image_url: product.image_url,
+    image_url: product.image_url || productImage(product),
     badge: product.badge ?? "",
     featured: product.featured,
   };
