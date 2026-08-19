@@ -21,10 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
-      setIsAdmin(data.session?.user ? null : false);
-      setSession(data.session);
+      let nextSession = data.session;
+
+      if (nextSession) {
+        const { data: userData, error } = await supabase.auth.getUser(nextSession.access_token);
+        if (!active) return;
+        if (error || !userData.user) {
+          await supabase.auth.signOut();
+          nextSession = null;
+        }
+      }
+
+      setIsAdmin(nextSession?.user ? null : false);
+      setSession(nextSession);
       setLoading(false);
     });
 

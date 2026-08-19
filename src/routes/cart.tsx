@@ -62,7 +62,7 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { lines, subtotal, setQty, remove, clear } = useCart();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const createCheckout = useServerFn(createCheckoutOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
@@ -177,7 +177,14 @@ function CartPage() {
       razorpay.open();
     } catch (error) {
       setPlacing(false);
-      toast.error(error instanceof Error ? error.message : "Checkout could not start.");
+      const message = error instanceof Error ? error.message : "Checkout could not start.";
+      if (message.toLowerCase().includes("unauthorized")) {
+        await signOut();
+        toast.error("Your login expired. Please sign in again to checkout.");
+        navigate({ to: "/login", search: { redirect: "/cart" } });
+        return;
+      }
+      toast.error(message);
     }
   }
 

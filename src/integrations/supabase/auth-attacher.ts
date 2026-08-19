@@ -8,8 +8,16 @@ export const attachSupabaseAuth = createMiddleware({ type: "function" }).client(
   async ({ next }) => {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
+    if (!token) return next({ headers: {} });
+
+    const { data: userData, error } = await supabase.auth.getUser(token);
+    if (error || !userData.user) {
+      await supabase.auth.signOut();
+      return next({ headers: {} });
+    }
+
     return next({
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: { Authorization: `Bearer ${token}` },
     });
   },
 );

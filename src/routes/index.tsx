@@ -38,7 +38,6 @@ function Home() {
   useScrollReveal([products.length]);
 
   const featured = products.filter((p) => p.featured);
-  const [lead, ...rest] = featured;
   const shippingConfig = getShippingConfig();
 
   return (
@@ -127,36 +126,11 @@ function Home() {
           </Link>
         </div>
 
-        {lead && (
-          <div className="mt-14 grid gap-10 lg:grid-cols-[1.25fr_1fr]">
-            <Link
-              to="/product/$slug"
-              params={{ slug: lead.slug }}
-              data-reveal
-              className="reveal-mask group relative block overflow-hidden bg-secondary"
-            >
-              <img
-                src={CATEGORY_IMAGES[lead.category] ?? heroImage}
-                alt={lead.name}
-                loading="lazy"
-                width={900}
-                height={1200}
-                className="aspect-[4/5] w-full object-cover transition-transform duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105 lg:aspect-[4/4.4]"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/75 to-transparent p-8">
-                <p className="text-[10px] tracking-[0.26em] text-background/80 uppercase">
-                  Piece of the season
-                </p>
-                <h3 className="mt-2 font-display text-3xl text-background">{lead.name}</h3>
-                <p className="mt-2 max-w-md text-sm text-background/80">{lead.description}</p>
-              </div>
-            </Link>
-
-            <div className="grid gap-10 sm:grid-cols-2">
-              {rest.slice(0, 4).map((product, i) => (
-                <ProductCard key={product.id} product={product} index={i} />
-              ))}
-            </div>
+        {featured.length > 0 && (
+          <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
+            {featured.slice(0, 6).map((product, i) => (
+              <ProductCard key={product.id} product={product} index={i} />
+            ))}
           </div>
         )}
       </section>
@@ -197,14 +171,14 @@ function Home() {
 
       {/* Story */}
       <section className="mx-auto grid max-w-7xl items-center gap-14 px-6 py-24 lg:grid-cols-2">
-        <div data-reveal className="reveal-mask overflow-hidden">
+        <div className="overflow-hidden bg-secondary">
           <img
             src={storyImage}
             alt="Folded natural linen fabric"
             loading="lazy"
             width={1400}
             height={900}
-            className="w-full object-cover"
+            className="aspect-[4/3] w-full object-cover"
           />
         </div>
         <div data-reveal className="reveal">
