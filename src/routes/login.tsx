@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Field } from "@/components/form-field";
+import { Field, PasswordField } from "@/components/form-field";
 
 type LoginSearch = { redirect?: string | undefined };
 
@@ -27,12 +27,28 @@ function Login() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setSubmitting(false);
     if (error) {
       toast.error(error.message);
       return;
     }
+
+    if (!redirect && data.user) {
+      const { data: role } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (role) {
+        toast.success("Welcome back, admin");
+        navigate({ to: "/admin" });
+        return;
+      }
+    }
+
     toast.success("Welcome back");
     navigate({ to: redirect || "/account" });
   }
@@ -46,7 +62,7 @@ function Login() {
 
       <form onSubmit={onSubmit} className="rise-in mt-10 space-y-4">
         <Field label="Email" type="email" value={email} onChange={setEmail} />
-        <Field label="Password" type="password" value={password} onChange={setPassword} />
+        <PasswordField label="Password" value={password} onChange={setPassword} />
         <button
           type="submit"
           disabled={submitting}

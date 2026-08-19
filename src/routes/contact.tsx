@@ -49,7 +49,7 @@ function Contact() {
           <InfoBlock
             icon={<Mail className="size-5" />}
             title="Email"
-            body="support@md-attire.example"
+            body="mdkaifeeeminence@gmail.com"
           />
           <InfoBlock
             icon={<MessageSquare className="size-5" />}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MD Attire">
+  <rect width="64" height="64" rx="14" fill="#2a241f"/>
+  <rect x="8" y="8" width="48" height="48" rx="10" fill="#faf8f5"/>
+  <path
+    d="M17 44V20h5.1l9.8 13.9L41.8 20H47v24h-5.8V29.9l-7.6 10.5h-3.3l-7.5-10.5V44H17Z"
+    fill="#2a241f"
+  />
+  <path d="M17 50h30" stroke="#8b7355" stroke-width="3" stroke-linecap="round"/>
+</svg>

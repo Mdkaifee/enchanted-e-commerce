@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Field } from "@/components/form-field";
+import { Field, PasswordField } from "@/components/form-field";
 
 type SignupSearch = { redirect?: string | undefined };
 
@@ -57,9 +57,8 @@ function Signup() {
       <form onSubmit={onSubmit} className="rise-in mt-10 space-y-4">
         <Field label="Full name" value={fullName} onChange={setFullName} />
         <Field label="Email" type="email" value={email} onChange={setEmail} />
-        <Field
+        <PasswordField
           label="Password"
-          type="password"
           value={password}
           onChange={setPassword}
           placeholder="At least 6 characters"

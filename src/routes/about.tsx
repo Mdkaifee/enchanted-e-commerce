@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import story from "@/assets/story.jpg";
+import studioImage from "@/assets/md-attire-studio.jpg";
 import { useScrollReveal } from "@/hooks/use-reveal";
 import { Marquee } from "@/components/marquee";
 
@@ -43,37 +43,36 @@ function About() {
 
   return (
     <div className="pb-24">
-      <header className="mx-auto max-w-7xl px-6 pt-16">
-        <p className="rise-in text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
-          The studio
-        </p>
-        <h1 className="rise-in mt-4 max-w-4xl font-display text-5xl leading-[1.05] font-light sm:text-7xl">
-          Clothes that are made once, and kept
-        </h1>
-      </header>
-
-      <section className="mx-auto mt-16 grid max-w-7xl gap-14 px-6 md:grid-cols-2 md:items-center">
-        <div data-reveal className="reveal-mask overflow-hidden bg-secondary">
-          <img
-            src={story}
-            alt="Inside the MD Attire studio"
-            loading="lazy"
-            className="aspect-[4/5] w-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
-          />
+      <section className="mx-auto grid max-w-7xl gap-12 px-6 pt-12 md:grid-cols-[0.92fr_1.08fr] md:items-center lg:pt-16">
+        <div className="rise-in">
+          <p className="text-[11px] tracking-[0.3em] text-muted-foreground uppercase">The studio</p>
+          <h1 className="mt-4 font-display text-4xl leading-[1.05] font-light sm:text-6xl">
+            Clothes that are made once, and kept
+          </h1>
+          <div className="mt-8 space-y-5 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              MD Attire began in a two-room studio with a single roll of Belgian linen and a
+              stubborn belief that a wardrobe should get better with age, not worse.
+            </p>
+            <p>
+              We work with three mills we've visited in person, dye in small lots, and finish every
+              garment by hand. It takes longer. That's the point.
+            </p>
+            <p>
+              Nothing is designed for a single season. Each piece is drafted to sit alongside what
+              came before it, so the collection grows rather than resets.
+            </p>
+          </div>
         </div>
-        <div data-reveal className="reveal space-y-5 text-sm leading-relaxed text-muted-foreground">
-          <p>
-            MD Attire began in a two-room studio with a single roll of Belgian linen and a stubborn
-            belief that a wardrobe should get better with age, not worse.
-          </p>
-          <p>
-            We work with three mills we've visited in person, dye in small lots, and finish every
-            garment by hand. It takes longer. That's the point.
-          </p>
-          <p>
-            Nothing is designed for a single season. Each piece is drafted to sit alongside what
-            came before it, so the collection grows rather than resets.
-          </p>
+
+        <div className="curtain-up overflow-hidden bg-secondary">
+          <img
+            src={studioImage}
+            alt="Inside the MD Attire studio"
+            width={1024}
+            height={1365}
+            className="aspect-[4/5] w-full object-cover object-center transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
+          />
         </div>
       </section>
 
