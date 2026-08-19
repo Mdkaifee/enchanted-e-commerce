@@ -438,7 +438,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       });
       orderResult = await supabaseAdmin
         .from("orders")
-        .select("id, user_id, status, razorpay_order_id")
+        .select("id, user_id, status, razorpay_order_id, razorpay_payment_id")
         .eq("id", data.orderId)
         .eq("user_id", userId)
         .single();
@@ -454,10 +454,19 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const { data: order, error: orderError } = orderResult;
 
     if (orderError || !order) throw new Error("Order not found.");
-    if (order.status !== "pending") throw new Error("This order is not pending payment.");
     if (order.razorpay_order_id !== data.razorpayOrderId) {
       throw new Error("Payment does not match this order.");
     }
+    if (order.status === "paid") {
+      console.info("[PaymentVerify] Order is already marked paid", {
+        trace,
+        orderId: order.id,
+        razorpayOrderId: order.razorpay_order_id,
+        razorpayPaymentId: order.razorpay_payment_id,
+      });
+      return { orderId: order.id };
+    }
+    if (order.status !== "pending") throw new Error("This order is not pending payment.");
 
     const expected = await hmacSha256Hex(
       `${data.razorpayOrderId}|${data.razorpayPaymentId}`,
@@ -497,7 +506,20 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
 
     const { data: paidOrder, error: updateError } = paidOrderResult;
 
-    if (updateError || !paidOrder) throw new Error("Could not mark this order paid.");
+    if (updateError || !paidOrder) {
+      const { data: existingPaidOrder } = await supabaseAdmin
+        .from("orders")
+        .select("id, status, razorpay_order_id")
+        .eq("id", data.orderId)
+        .eq("user_id", userId)
+        .eq("razorpay_order_id", data.razorpayOrderId)
+        .eq("status", "paid")
+        .maybeSingle();
+
+      if (existingPaidOrder) return { orderId: existingPaidOrder.id };
+
+      throw new Error("Could not mark this order paid.");
+    }
 
     return { orderId: paidOrder.id };
   });

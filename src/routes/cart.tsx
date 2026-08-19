@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CreditCard, Minus, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
@@ -32,6 +32,9 @@ type RazorpayCheckoutOptions = {
   theme: {
     color: string;
   };
+  retry?: {
+    enabled: boolean;
+  };
   handler: (response: RazorpayCheckoutResponse) => void | Promise<void>;
   modal: {
     ondismiss: () => void;
@@ -42,6 +45,7 @@ declare global {
   interface Window {
     Razorpay?: new (options: RazorpayCheckoutOptions) => {
       open: () => void;
+      on: (event: "payment.failed", callback: () => void) => void;
     };
   }
 }
@@ -85,6 +89,7 @@ function CartPage() {
   const createCheckout = useServerFn(createCheckoutOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
   const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -128,12 +133,14 @@ function CartPage() {
 
   async function placeOrder(e: React.FormEvent) {
     e.preventDefault();
+    if (placingRef.current) return;
     if (lines.length === 0) return;
     if (!user) {
       navigate({ to: "/login", search: { redirect: "/cart" } });
       return;
     }
 
+    placingRef.current = true;
     setPlacing(true);
     try {
       if (form.full_name.trim().length < 2) {
@@ -154,6 +161,7 @@ function CartPage() {
 
       const session = await getFreshSupabaseSession();
       if (!session) {
+        placingRef.current = false;
         setPlacing(false);
         await signOut();
         navigate({ to: "/login", search: { redirect: "/cart" } });
@@ -174,6 +182,7 @@ function CartPage() {
         throw new Error("Razorpay checkout could not load. Check your connection and try again.");
       }
 
+      let checkoutFinished = false;
       const razorpay = new window.Razorpay({
         key: checkout.keyId,
         amount: checkout.amount,
@@ -191,10 +200,14 @@ function CartPage() {
         theme: {
           color: "#8b7355",
         },
+        retry: {
+          enabled: false,
+        },
         handler: async (response) => {
           try {
             const paymentSession = await getFreshSupabaseSession();
             if (!paymentSession) {
+              placingRef.current = false;
               await signOut();
               navigate({ to: "/login", search: { redirect: "/cart" } });
               toast.error("Please sign in again to verify payment.");
@@ -211,24 +224,37 @@ function CartPage() {
               },
             });
             clear();
+            checkoutFinished = true;
             toast.success("Payment verified. Your order is confirmed.");
             navigate({ to: "/order/$id", params: { id: paid.orderId } });
           } catch (error) {
             toast.error(checkoutErrorMessage(error, "Payment verification failed."));
           } finally {
+            placingRef.current = false;
             setPlacing(false);
           }
         },
         modal: {
           ondismiss: () => {
+            placingRef.current = false;
             setPlacing(false);
-            toast.message("Payment window closed. Your order is still pending.");
+            if (!checkoutFinished) {
+              toast.message("Payment window closed. Your order is still pending.");
+            }
           },
         },
       });
 
+      razorpay.on("payment.failed", () => {
+        checkoutFinished = true;
+        placingRef.current = false;
+        setPlacing(false);
+        toast.error("Payment was not completed. Start checkout again to create a fresh order.");
+      });
+
       razorpay.open();
     } catch (error) {
+      placingRef.current = false;
       setPlacing(false);
       const message = checkoutErrorMessage(error);
       if (message.toLowerCase().includes("unauthorized")) {
