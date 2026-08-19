@@ -178,6 +178,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      product_categories: {
+        Row: {
+          created_at: string;
+          id: string;
+          image_url: string;
+          name: string;
+          slug: string;
+          sort_order: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          image_url?: string;
+          name: string;
+          slug: string;
+          sort_order?: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          image_url?: string;
+          name?: string;
+          slug?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
       products: {
         Row: {
           badge: string | null;

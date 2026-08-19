@@ -23,6 +23,15 @@ export type Product = {
   featured: boolean;
 };
 
+export type ProductCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string;
+  sort_order: number;
+  created_at: string;
+};
+
 export const CATEGORY_IMAGES: Record<string, string> = {
   Shirts: shirts,
   Knitwear: knitwear,
@@ -33,6 +42,15 @@ export const CATEGORY_IMAGES: Record<string, string> = {
 };
 
 export const CATEGORIES = Object.keys(CATEGORY_IMAGES);
+
+export const DEFAULT_CATEGORIES: ProductCategory[] = CATEGORIES.map((name, index) => ({
+  id: `default-${name.toLowerCase()}`,
+  name,
+  slug: slugify(name),
+  image_url: "",
+  sort_order: (index + 1) * 10,
+  created_at: "",
+}));
 
 export function productImage(
   product: Pick<Product, "image_url" | "category"> & {
@@ -52,10 +70,21 @@ export function productImage(
   return imageUrl || firstColorImage || CATEGORY_IMAGES[product.category] || shirts;
 }
 
-export function productCategories(products: Pick<Product, "category">[]) {
-  return Array.from(new Set([...CATEGORIES, ...products.map((product) => product.category)]))
+export function productCategories(
+  products: Pick<Product, "category">[],
+  configuredCategories: string[] = CATEGORIES,
+) {
+  const categories = [...configuredCategories, ...products.map((product) => product.category)]
     .map((category) => category.trim())
     .filter(Boolean);
+  const seen = new Set<string>();
+
+  return categories.filter((category) => {
+    const key = category.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function categoryImage(category: string, products: Product[] = []) {
@@ -65,6 +94,14 @@ export function categoryImage(category: string, products: Product[] = []) {
 
 export function formatPrice(value: number) {
   return `₹${value.toFixed(0)}`;
+}
+
+export function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 async function fetchProducts(): Promise<Product[]> {
@@ -90,5 +127,28 @@ async function fetchProducts(): Promise<Product[]> {
 export const productsQuery = queryOptions({
   queryKey: ["products"],
   queryFn: fetchProducts,
+  staleTime: 5 * 60 * 1000,
+});
+
+async function fetchProductCategories(): Promise<ProductCategory[]> {
+  const { data, error } = await supabase
+    .from("product_categories")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    if (error.code === "42P01" || error.message.toLowerCase().includes("product_categories")) {
+      return DEFAULT_CATEGORIES;
+    }
+    throw error;
+  }
+
+  return (data ?? []) as ProductCategory[];
+}
+
+export const categoriesQuery = queryOptions({
+  queryKey: ["product_categories"],
+  queryFn: fetchProductCategories,
   staleTime: 5 * 60 * 1000,
 });

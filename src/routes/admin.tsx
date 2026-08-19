@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import {
   CATEGORIES,
+  categoriesQuery,
   formatPrice,
   productCategories,
   productsQuery,
@@ -123,9 +124,45 @@ function Admin() {
 function ProductsAdmin() {
   const queryClient = useQueryClient();
   const { data: products = [], isLoading } = useQuery(productsQuery);
+  const { data: managedCategories = [] } = useQuery(categoriesQuery);
   const [form, setForm] = useState<ProductForm>(emptyProduct);
-  const categories = productCategories(products);
+  const [newCategory, setNewCategory] = useState("");
+  const categories = productCategories(
+    [...products, { category: form.category }],
+    managedCategories.map((category) => category.name),
+  );
   const imagePreview = form.image_url.trim();
+
+  const addCategory = useMutation({
+    mutationFn: async () => {
+      const name = newCategory.trim();
+      if (!name) throw new Error("Enter a category name.");
+
+      const { error } = await supabase.from("product_categories").insert({
+        name,
+        slug: slugify(name),
+        sort_order: (managedCategories.length + 1) * 10,
+      });
+
+      if (error) throw error;
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: categoriesQuery.queryKey });
+      setNewCategory("");
+      setFormValue(setForm, { category: name });
+      toast.success("Category added");
+    },
+    onError: (error: Error) => {
+      const lowerMessage = error.message.toLowerCase();
+      const message = lowerMessage.includes("duplicate")
+        ? "That category already exists."
+        : lowerMessage.includes("product_categories")
+          ? "Product categories table is not ready. Apply the latest Supabase migration."
+          : error.message;
+      toast.error(message);
+    },
+  });
 
   const uploadImage = useMutation({
     mutationFn: async (file: File) => {
@@ -249,6 +286,53 @@ function ProductsAdmin() {
           )}
         </div>
         <div className="mt-6 grid gap-4">
+          <div className="border border-border p-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
+                  Categories
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Add once here, then use it in the product dropdown and shop filters.
+                </p>
+              </div>
+              <div className="flex min-w-full gap-2 sm:min-w-[280px]">
+                <input
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addCategory.mutate();
+                    }
+                  }}
+                  placeholder="Sarees"
+                  className="min-w-0 flex-1 border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => addCategory.mutate()}
+                  disabled={addCategory.isPending}
+                  className="press inline-flex items-center justify-center gap-2 border border-border px-4 py-2.5 text-xs tracking-[0.18em] uppercase hover:bg-secondary disabled:opacity-60"
+                >
+                  <Plus className="size-4" />
+                  Add
+                </button>
+              </div>
+            </div>
+            {categories.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <span
+                    key={category}
+                    className="border border-border px-3 py-1.5 text-[10px] tracking-[0.18em] text-muted-foreground uppercase"
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <AdminField
             label="Name"
             value={form.name}
@@ -275,18 +359,17 @@ function ProductsAdmin() {
               <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
                 Category
               </span>
-              <input
+              <select
                 value={form.category}
                 onChange={(event) => setFormValue(setForm, { category: event.target.value })}
-                list="admin-product-categories"
-                placeholder="Shirts, Sarees, Footwear"
                 className="mt-1 w-full border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-              />
-              <datalist id="admin-product-categories">
+              >
                 {categories.map((category) => (
-                  <option key={category} value={category} />
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </label>
           </div>
           <AdminField

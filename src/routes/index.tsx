@@ -5,7 +5,13 @@ import { ArrowRight } from "lucide-react";
 
 import heroImage from "@/assets/hero.jpg";
 import storyImage from "@/assets/story.jpg";
-import { categoryImage, formatPrice, productCategories, productsQuery } from "@/lib/catalog";
+import {
+  categoriesQuery,
+  categoryImage,
+  formatPrice,
+  productCategories,
+  productsQuery,
+} from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { Marquee } from "@/components/marquee";
 import { useParallax, useScrollReveal } from "@/hooks/use-reveal";
@@ -33,12 +39,16 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { data: products = [] } = useQuery(productsQuery);
+  const { data: managedCategories = [] } = useQuery(categoriesQuery);
   const [scrollY, setScrollY] = useState(0);
   useParallax(setScrollY);
   useScrollReveal([products.length]);
 
   const featured = products.filter((p) => p.featured);
-  const categories = productCategories(products);
+  const categories = productCategories(
+    products,
+    managedCategories.map((category) => category.name),
+  );
   const shippingConfig = getShippingConfig();
 
   return (

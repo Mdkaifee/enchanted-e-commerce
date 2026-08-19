@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { productCategories, productsQuery } from "@/lib/catalog";
+import { categoriesQuery, productCategories, productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
 
@@ -34,8 +34,16 @@ function Shop() {
   const { category } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { data: products = [], isLoading } = useQuery(productsQuery);
+  const { data: managedCategories = [] } = useQuery(categoriesQuery);
   const [sort, setSort] = useState<"featured" | "low" | "high">("featured");
-  const categories = useMemo(() => productCategories(products), [products]);
+  const categories = useMemo(
+    () =>
+      productCategories(
+        products,
+        managedCategories.map((managedCategory) => managedCategory.name),
+      ),
+    [products, managedCategories],
+  );
 
   const visible = useMemo(() => {
     const list = category ? products.filter((p) => p.category === category) : products;
