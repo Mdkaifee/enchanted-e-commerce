@@ -90,8 +90,8 @@ function Login() {
         {adminSeedMissing && (
           <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-relaxed text-destructive">
             Admin auto-seed could not finish. Check Lovable Cloud secrets for{" "}
-            <span className="font-medium">SUPABASE_SERVICE_ROLE_KEY</span> and make sure the latest
-            database migrations are applied.
+            <span className="font-medium">APP_SUPABASE_SERVICE_ROLE_KEY</span> and make sure the
+            latest database migrations are applied.
           </div>
         )}
         <button

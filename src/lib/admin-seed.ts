@@ -18,7 +18,7 @@ type AdminSeedResult =
     };
 
 function isMissingServiceRoleError(error: unknown) {
-  return error instanceof Error && error.message.includes("SUPABASE_SERVICE_ROLE_KEY");
+  return error instanceof Error && error.message.includes("APP_SUPABASE_SERVICE_ROLE_KEY");
 }
 
 function isMissingMigrationError(error: { code?: string; message?: string } | null) {
@@ -99,7 +99,7 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
           ok: false,
           reason: "missing_service_role",
           message:
-            "Add SUPABASE_SERVICE_ROLE_KEY in Lovable Cloud secrets so the server can seed Supabase Auth.",
+            "Add APP_SUPABASE_SERVICE_ROLE_KEY in Lovable Cloud secrets so the server can seed Supabase Auth.",
         };
       }
 
