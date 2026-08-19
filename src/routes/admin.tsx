@@ -132,6 +132,8 @@ function ProductsAdmin() {
     managedCategories.map((category) => category.name),
   );
   const imagePreview = form.image_url.trim();
+  const productColors = splitList(form.colors);
+  const colorImages = parseColorImages(form.color_images);
 
   const addCategory = useMutation({
     mutationFn: async () => {
@@ -213,22 +215,30 @@ function ProductsAdmin() {
 
   const saveProduct = useMutation({
     mutationFn: async () => {
+      const colors = splitList(form.colors);
+      const colorImagesByColor = filterColorImages(parseColorImages(form.color_images), colors);
+      const firstColorImage = Object.values(colorImagesByColor).find(Boolean) ?? "";
       const payload = {
         slug: form.slug.trim() || slugify(form.name),
         name: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
         category: form.category.trim(),
-        colors: splitList(form.colors),
-        color_images: parseColorImages(form.color_images),
+        colors,
+        color_images: colorImagesByColor,
         sizes: splitList(form.sizes),
-        image_url: form.image_url.trim(),
+        image_url: form.image_url.trim() || firstColorImage,
         badge: form.badge.trim() || null,
         featured: form.featured,
       };
 
       if (!payload.name || !payload.slug || !payload.category || !Number.isFinite(payload.price)) {
         throw new Error("Name, slug, category and price are required.");
+      }
+
+      const missingColorImages = payload.colors.filter((color) => !colorImagesByColor[color]);
+      if (missingColorImages.length > 0) {
+        throw new Error(`Upload or paste an image for: ${missingColorImages.join(", ")}.`);
       }
 
       if (form.id) {
@@ -378,43 +388,108 @@ function ProductsAdmin() {
             onChange={(colors) => setFormValue(setForm, { colors })}
             placeholder="Sand, Ivory, Clay"
           />
-          <AdminField
-            label="Color image URLs"
-            value={form.color_images}
-            onChange={(color_images) => setFormValue(setForm, { color_images })}
-            placeholder={"Sand: https://...\nIvory: https://...\nClay: https://..."}
-            multiline
-            required={false}
-          />
-          <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-3 text-xs tracking-[0.18em] uppercase hover:bg-secondary">
-            <Upload className="size-4" />
-            {uploadColorImages.isPending ? "Uploading color images..." : "Upload color images"}
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              disabled={uploadColorImages.isPending}
-              onChange={(event) => {
-                const files = Array.from(event.currentTarget.files ?? []);
-                event.currentTarget.value = "";
-                if (files.length === 0) return;
+          <div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
+                  Color images
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  One image is required for each color.
+                </p>
+              </div>
+              {productColors.length > 0 && (
+                <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-2.5 text-xs tracking-[0.18em] uppercase hover:bg-secondary">
+                  <Upload className="size-4" />
+                  {uploadColorImages.isPending ? "Uploading..." : "Upload all"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    disabled={uploadColorImages.isPending}
+                    onChange={(event) => {
+                      const files = Array.from(event.currentTarget.files ?? []);
+                      event.currentTarget.value = "";
+                      if (files.length === 0) return;
 
-                const colors = splitList(form.colors);
-                const uploads: ColorImageUpload[] = [];
+                      if (files.length !== productColors.length) {
+                        toast.error(
+                          `Select exactly ${productColors.length} image${
+                            productColors.length === 1 ? "" : "s"
+                          }, one for each color.`,
+                        );
+                        return;
+                      }
 
-                for (const [index, file] of files.entries()) {
-                  const suggestedColor = colors[index] ?? colors[0] ?? "";
-                  const color = window.prompt(`Colour for ${file.name}`, suggestedColor);
-                  if (color?.trim()) {
-                    uploads.push({ color: color.trim(), file });
-                  }
-                }
-
-                if (uploads.length > 0) uploadColorImages.mutate(uploads);
-              }}
-            />
-          </label>
+                      uploadColorImages.mutate(
+                        files.map((file, index) => ({
+                          color: productColors[index],
+                          file,
+                        })),
+                      );
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {productColors.length === 0 ? (
+              <div className="mt-2 border border-border bg-secondary/40 p-4 text-xs text-muted-foreground">
+                Add colors first to create image upload slots.
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-3">
+                {productColors.map((color) => {
+                  const imageUrl = colorImages[color] ?? "";
+                  return (
+                    <div key={color} className="border border-border p-3">
+                      <div className="grid gap-3 sm:grid-cols-[72px_1fr]">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt=""
+                            className="aspect-square w-full bg-secondary object-cover"
+                          />
+                        ) : (
+                          <div className="grid aspect-square w-full place-items-center bg-secondary text-center text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+                            No image
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-display text-sm">{color}</p>
+                            <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-3 py-2 text-[10px] tracking-[0.18em] uppercase hover:bg-secondary">
+                              <Upload className="size-3.5" />
+                              Upload
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="sr-only"
+                                disabled={uploadColorImages.isPending}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  event.currentTarget.value = "";
+                                  if (file) uploadColorImages.mutate([{ color, file }]);
+                                }}
+                              />
+                            </label>
+                          </div>
+                          <input
+                            value={imageUrl}
+                            onChange={(event) =>
+                              setColorImageValue(setForm, color, event.target.value)
+                            }
+                            placeholder={`${color} image URL`}
+                            className="mt-2 w-full border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <AdminField
             label="Sizes"
             value={form.sizes}
@@ -752,6 +827,25 @@ function setFormValue(setForm: Dispatch<SetStateAction<ProductForm>>, patch: Par
   setForm((current) => ({ ...current, ...patch }));
 }
 
+function setColorImageValue(
+  setForm: Dispatch<SetStateAction<ProductForm>>,
+  color: string,
+  imageUrl: string,
+) {
+  setForm((current) => {
+    const colorImages = parseColorImages(current.color_images);
+    const nextUrl = imageUrl.trim();
+
+    if (nextUrl) {
+      colorImages[color] = nextUrl;
+    } else {
+      delete colorImages[color];
+    }
+
+    return { ...current, color_images: formatColorImages(colorImages) };
+  });
+}
+
 async function uploadProductImage(file: File, namePrefix: string) {
   if (!file.type.startsWith("image/")) {
     throw new Error("Upload an image file.");
@@ -822,6 +916,14 @@ function formatColorImages(colorImages: Record<string, string>) {
   return Object.entries(colorImages)
     .map(([color, imageUrl]) => `${color}: ${imageUrl}`)
     .join("\n");
+}
+
+function filterColorImages(colorImages: Record<string, string>, colors: string[]) {
+  return Object.fromEntries(
+    colors
+      .map((color) => [color, colorImages[color]?.trim()] as const)
+      .filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
 }
 
 function slugify(value: string) {
