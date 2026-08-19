@@ -2,6 +2,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
+const DEFAULT_SUPABASE_URL = "https://qrzacztkouanbpvogfzs.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WBsqgeOyqbRxLsF8aBQwhA_05Yoxnzz";
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
@@ -33,16 +36,18 @@ function createSupabaseClient() {
   const SUPABASE_URL =
     import.meta.env["APP_PUBLIC_SUPABASE_URL"] ||
     import.meta.env["VITE_APP_SUPABASE_URL"] ||
-    import.meta.env["VITE_SUPABASE_URL"] ||
     process.env["APP_PUBLIC_SUPABASE_URL"] ||
     process.env["APP_SUPABASE_URL"] ||
+    DEFAULT_SUPABASE_URL ||
+    import.meta.env["VITE_SUPABASE_URL"] ||
     process.env["SUPABASE_URL"];
   const SUPABASE_PUBLISHABLE_KEY =
     import.meta.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ||
     import.meta.env["VITE_APP_SUPABASE_PUBLISHABLE_KEY"] ||
-    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ||
+    DEFAULT_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["SUPABASE_PUBLISHABLE_KEY"];
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
