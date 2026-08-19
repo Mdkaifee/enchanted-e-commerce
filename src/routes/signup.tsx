@@ -28,10 +28,15 @@ function Signup() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    const redirectPath = redirect || "/account";
+    const emailRedirectTo =
+      typeof window === "undefined"
+        ? "https://md-attire.lovable.app/account"
+        : new URL(redirectPath, window.location.origin).toString();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName }, emailRedirectTo },
     });
     setSubmitting(false);
     if (error) {
