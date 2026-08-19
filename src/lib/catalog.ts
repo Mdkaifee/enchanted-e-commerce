@@ -16,6 +16,7 @@ export type Product = {
   price: number;
   category: string;
   colors: string[];
+  color_images: Record<string, string>;
   sizes: string[];
   image_url: string;
   badge: string | null;
@@ -33,9 +34,33 @@ export const CATEGORY_IMAGES: Record<string, string> = {
 
 export const CATEGORIES = Object.keys(CATEGORY_IMAGES);
 
-export function productImage(product: Pick<Product, "image_url" | "category">) {
+export function productImage(
+  product: Pick<Product, "image_url" | "category"> & {
+    color_images?: Record<string, string> | null;
+  },
+  color?: string,
+) {
+  if (color && product.color_images?.[color]?.trim()) {
+    return product.color_images[color].trim();
+  }
+
   const imageUrl = product.image_url.trim();
-  return imageUrl || CATEGORY_IMAGES[product.category] || shirts;
+  const firstColorImage = product.color_images
+    ? Object.values(product.color_images).find((value) => value.trim())
+    : undefined;
+
+  return imageUrl || firstColorImage || CATEGORY_IMAGES[product.category] || shirts;
+}
+
+export function productCategories(products: Pick<Product, "category">[]) {
+  return Array.from(new Set([...CATEGORIES, ...products.map((product) => product.category)]))
+    .map((category) => category.trim())
+    .filter(Boolean);
+}
+
+export function categoryImage(category: string, products: Product[] = []) {
+  const categoryProduct = products.find((product) => product.category === category);
+  return CATEGORY_IMAGES[category] || (categoryProduct ? productImage(categoryProduct) : shirts);
 }
 
 export function formatPrice(value: number) {
@@ -51,6 +76,14 @@ async function fetchProducts(): Promise<Product[]> {
   return (data ?? []).map((row) => ({
     ...row,
     price: Number(row.price),
+    color_images:
+      row.color_images && typeof row.color_images === "object" && !Array.isArray(row.color_images)
+        ? Object.fromEntries(
+            Object.entries(row.color_images)
+              .filter(([, value]) => typeof value === "string")
+              .map(([key, value]) => [key, String(value)]),
+          )
+        : {},
   })) as Product[];
 }
 

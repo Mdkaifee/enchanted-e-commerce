@@ -102,6 +102,23 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function productImageForColor(
+  product: { image_url: string; color_images?: unknown },
+  color: string,
+) {
+  const colorImages =
+    product.color_images &&
+    typeof product.color_images === "object" &&
+    !Array.isArray(product.color_images)
+      ? (product.color_images as Record<string, unknown>)
+      : {};
+  const colorImage = colorImages[color];
+
+  return typeof colorImage === "string" && colorImage.trim()
+    ? colorImage.trim()
+    : product.image_url;
+}
+
 async function hmacSha256Hex(message: string, secret: string) {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -229,7 +246,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       console.info("[Checkout:SupabaseProducts] Querying products", { trace, slugs });
       productResult = await supabaseAdmin
         .from("products")
-        .select("id, slug, name, price, image_url, category, colors, sizes")
+        .select("id, slug, name, price, image_url, color_images, category, colors, sizes")
         .in("slug", slugs);
     } catch (error) {
       checkoutServiceError(
@@ -271,7 +288,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
         category: product.category,
         size: line.size,
         color: line.color,
-        image: product.image_url,
+        image: productImageForColor(product, line.color),
         qty: line.qty,
       };
     });

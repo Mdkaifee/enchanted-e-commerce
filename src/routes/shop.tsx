@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { CATEGORIES, productsQuery } from "@/lib/catalog";
+import { productCategories, productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
 
@@ -35,6 +35,7 @@ function Shop() {
   const navigate = Route.useNavigate();
   const { data: products = [], isLoading } = useQuery(productsQuery);
   const [sort, setSort] = useState<"featured" | "low" | "high">("featured");
+  const categories = useMemo(() => productCategories(products), [products]);
 
   const visible = useMemo(() => {
     const list = category ? products.filter((p) => p.category === category) : products;
@@ -61,7 +62,7 @@ function Shop() {
       <div className="mt-12 flex flex-wrap items-center justify-between gap-6 border-y border-border py-4">
         <div className="flex flex-wrap gap-2">
           <FilterChip active={!category} onClick={() => navigate({ search: {} })} label="All" />
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <FilterChip
               key={c}
               active={category === c}

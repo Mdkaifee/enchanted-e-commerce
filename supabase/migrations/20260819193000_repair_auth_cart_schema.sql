@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   price numeric(10,2) NOT NULL,
   category text NOT NULL,
   colors text[] NOT NULL DEFAULT '{}',
+  color_images jsonb NOT NULL DEFAULT '{}'::jsonb,
   sizes text[] NOT NULL DEFAULT '{}',
   image_url text NOT NULL DEFAULT '',
   badge text,
@@ -86,6 +87,9 @@ CREATE TABLE IF NOT EXISTS public.products (
 GRANT SELECT ON public.products TO anon;
 GRANT SELECT ON public.products TO authenticated;
 GRANT ALL ON public.products TO service_role;
+
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS color_images jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 

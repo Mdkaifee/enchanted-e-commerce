@@ -46,7 +46,6 @@ function ProductDetail() {
 
   const [size, setSize] = useState<string>("");
   const [color, setColor] = useState<string>("");
-  const [displayImage, setDisplayImage] = useState<string>("");
   const selectedLine = useMemo(
     () =>
       product
@@ -61,7 +60,6 @@ function ProductDetail() {
     if (product) {
       setSize(product.sizes[0] ?? "One size");
       setColor(product.colors[0] ?? "Natural");
-      setDisplayImage(productImage(product));
     }
   }, [product]);
 
@@ -98,7 +96,7 @@ function ProductDetail() {
   }
 
   const fallbackImage = CATEGORY_IMAGES[product.category] ?? productImage(product);
-  const detailImage = displayImage || productImage(product);
+  const detailImage = productImage(product, color);
 
   return (
     <div className="mx-auto max-w-7xl px-6 pt-10 pb-24">
@@ -121,7 +119,11 @@ function ProductDetail() {
               alt={product.name}
               width={1200}
               height={1600}
-              onError={() => setDisplayImage(fallbackImage)}
+              onError={(event) => {
+                if (event.currentTarget.src !== fallbackImage) {
+                  event.currentTarget.src = fallbackImage;
+                }
+              }}
               className="absolute inset-0 size-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
             />
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-background/75 to-transparent px-5 pt-5 pb-16 text-[10px] tracking-[0.22em] text-foreground uppercase">
@@ -220,7 +222,7 @@ function ProductDetail() {
                   price: product.price,
                   size: size || "One size",
                   color: color || "Natural",
-                  image: displayImage || productImage(product),
+                  image: detailImage,
                 });
                 toast.success(`${product.name} added to your bag`);
               }}

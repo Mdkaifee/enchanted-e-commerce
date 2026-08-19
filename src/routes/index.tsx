@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 
 import heroImage from "@/assets/hero.jpg";
 import storyImage from "@/assets/story.jpg";
-import { CATEGORIES, CATEGORY_IMAGES, formatPrice, productsQuery } from "@/lib/catalog";
+import { categoryImage, formatPrice, productCategories, productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { Marquee } from "@/components/marquee";
 import { useParallax, useScrollReveal } from "@/hooks/use-reveal";
@@ -38,6 +38,7 @@ function Home() {
   useScrollReveal([products.length]);
 
   const featured = products.filter((p) => p.featured);
+  const categories = productCategories(products);
   const shippingConfig = getShippingConfig();
 
   return (
@@ -142,7 +143,7 @@ function Home() {
             Browse by category
           </h2>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {CATEGORIES.map((category, i) => (
+            {categories.map((category, i) => (
               <Link
                 key={category}
                 to="/shop"
@@ -152,7 +153,7 @@ function Home() {
                 style={{ transitionDelay: `${(i % 3) * 90}ms` }}
               >
                 <img
-                  src={CATEGORY_IMAGES[category]}
+                  src={categoryImage(category, products)}
                   alt={category}
                   loading="lazy"
                   width={900}

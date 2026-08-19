@@ -5,7 +5,14 @@ import { useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { toast } from "sonner";
 
-import { CATEGORIES, formatPrice, productsQuery, type Product } from "@/lib/catalog";
+import {
+  CATEGORIES,
+  categoryImage,
+  formatPrice,
+  productCategories,
+  productsQuery,
+  type Product,
+} from "@/lib/catalog";
 import { allOrdersQuery } from "@/lib/orders";
 import { useRequireAdmin } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +26,7 @@ type ProductForm = {
   price: string;
   category: string;
   colors: string;
+  color_images: string;
   sizes: string;
   image_url: string;
   badge: string;
@@ -48,6 +56,7 @@ const emptyProduct: ProductForm = {
   price: "",
   category: CATEGORIES[0] ?? "Shirts",
   colors: "",
+  color_images: "",
   sizes: "",
   image_url: "",
   badge: "",
@@ -108,6 +117,8 @@ function ProductsAdmin() {
   const queryClient = useQueryClient();
   const { data: products = [], isLoading } = useQuery(productsQuery);
   const [form, setForm] = useState<ProductForm>(emptyProduct);
+  const categories = productCategories(products);
+  const imagePreview = form.image_url.trim() || categoryImage(form.category, products);
 
   const saveProduct = useMutation({
     mutationFn: async () => {
@@ -116,16 +127,17 @@ function ProductsAdmin() {
         name: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
-        category: form.category,
+        category: form.category.trim(),
         colors: splitList(form.colors),
+        color_images: parseColorImages(form.color_images),
         sizes: splitList(form.sizes),
         image_url: form.image_url.trim(),
         badge: form.badge.trim() || null,
         featured: form.featured,
       };
 
-      if (!payload.name || !payload.slug || !Number.isFinite(payload.price)) {
-        throw new Error("Name, slug and price are required.");
+      if (!payload.name || !payload.slug || !payload.category || !Number.isFinite(payload.price)) {
+        throw new Error("Name, slug, category and price are required.");
       }
 
       if (form.id) {
@@ -209,17 +221,18 @@ function ProductsAdmin() {
               <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
                 Category
               </span>
-              <select
+              <input
                 value={form.category}
                 onChange={(event) => setFormValue(setForm, { category: event.target.value })}
+                list="admin-product-categories"
+                placeholder="Shirts, Sarees, Footwear"
                 className="mt-1 w-full border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-              >
-                {CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
+              />
+              <datalist id="admin-product-categories">
+                {categories.map((category) => (
+                  <option key={category} value={category} />
                 ))}
-              </select>
+              </datalist>
             </label>
           </div>
           <AdminField
@@ -227,6 +240,14 @@ function ProductsAdmin() {
             value={form.colors}
             onChange={(colors) => setFormValue(setForm, { colors })}
             placeholder="Sand, Ivory, Clay"
+          />
+          <AdminField
+            label="Color image URLs"
+            value={form.color_images}
+            onChange={(color_images) => setFormValue(setForm, { color_images })}
+            placeholder={"Sand: https://...\nIvory: https://...\nClay: https://..."}
+            multiline
+            required={false}
           />
           <AdminField
             label="Sizes"
@@ -239,6 +260,23 @@ function ProductsAdmin() {
             value={form.image_url}
             onChange={(image_url) => setFormValue(setForm, { image_url })}
           />
+          <div>
+            <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
+              Current image
+            </span>
+            <div className="mt-2 grid grid-cols-[88px_1fr] items-center gap-3 border border-border p-2">
+              <img
+                src={imagePreview}
+                alt=""
+                className="aspect-square w-full bg-secondary object-cover"
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {form.image_url.trim()
+                  ? "Using the saved product image URL."
+                  : "Image URL is optional. Blank products use the category/default image."}
+              </p>
+            </div>
+          </div>
           <AdminField
             label="Badge"
             value={form.badge}
@@ -484,12 +522,14 @@ function AdminField({
   onChange,
   placeholder,
   multiline = false,
+  required = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  required?: boolean;
 }) {
   const className =
     "mt-1 w-full border border-border bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary";
@@ -499,7 +539,7 @@ function AdminField({
       <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">{label}</span>
       {multiline ? (
         <textarea
-          required
+          required={required}
           rows={4}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -508,7 +548,7 @@ function AdminField({
         />
       ) : (
         <input
-          required={label !== "Image URL" && label !== "Badge"}
+          required={required && label !== "Image URL" && label !== "Badge"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
@@ -532,6 +572,7 @@ function productToForm(product: Product): ProductForm {
     price: String(product.price),
     category: product.category,
     colors: product.colors.join(", "),
+    color_images: formatColorImages(product.color_images),
     sizes: product.sizes.join(", "),
     image_url: product.image_url,
     badge: product.badge ?? "",
@@ -544,6 +585,29 @@ function splitList(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseColorImages(value: string) {
+  return Object.fromEntries(
+    value
+      .split(/\n|,/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separatorIndex = line.search(/[:=]/);
+        if (separatorIndex === -1) return null;
+        const color = line.slice(0, separatorIndex).trim();
+        const imageUrl = line.slice(separatorIndex + 1).trim();
+        return color && imageUrl ? [color, imageUrl] : null;
+      })
+      .filter((entry): entry is [string, string] => Boolean(entry)),
+  );
+}
+
+function formatColorImages(colorImages: Record<string, string>) {
+  return Object.entries(colorImages)
+    .map(([color, imageUrl]) => `${color}: ${imageUrl}`)
+    .join("\n");
 }
 
 function slugify(value: string) {
