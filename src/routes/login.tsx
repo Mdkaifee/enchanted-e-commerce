@@ -4,6 +4,8 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Field, PasswordField } from "@/components/form-field";
+import { ensureAdminAccount } from "@/lib/admin-seed";
+import { useServerFn } from "@tanstack/react-start";
 
 type LoginSearch = { redirect?: string | undefined };
 
@@ -20,6 +22,7 @@ export const Route = createFileRoute("/login")({
 function Login() {
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
+  const seedAdmin = useServerFn(ensureAdminAccount);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminSeedMissing, setAdminSeedMissing] = useState(false);
@@ -29,17 +32,28 @@ function Login() {
     e.preventDefault();
     setSubmitting(true);
     setAdminSeedMissing(false);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    setSubmitting(false);
-    if (error) {
-      if (
-        email.trim().toLowerCase() === "test@yopmail.com" &&
-        error.message.toLowerCase().includes("invalid login credentials")
-      ) {
+    let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    const isAdminLogin = email.trim().toLowerCase() === "test@yopmail.com";
+
+    if (
+      error &&
+      isAdminLogin &&
+      error.message.toLowerCase().includes("invalid login credentials")
+    ) {
+      const seedResult = await seedAdmin({ data: { email, password } });
+      if (seedResult.ok) {
+        ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
+      } else {
+        setSubmitting(false);
         setAdminSeedMissing(true);
-        toast.error("Admin account is not seeded in Supabase Auth yet.");
+        toast.error(seedResult.message);
         return;
       }
+    }
+
+    setSubmitting(false);
+    if (error) {
       toast.error(error.message);
       return;
     }
@@ -75,8 +89,9 @@ function Login() {
         <PasswordField label="Password" value={password} onChange={setPassword} />
         {adminSeedMissing && (
           <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-relaxed text-destructive">
-            The admin email exists in the app config, but it has not been created in the connected
-            Supabase Auth database yet. Apply the latest Supabase migrations, then sign in again.
+            Admin auto-seed could not finish. Check Lovable Cloud secrets for{" "}
+            <span className="font-medium">SUPABASE_SERVICE_ROLE_KEY</span> and make sure the latest
+            database migrations are applied.
           </div>
         )}
         <button
