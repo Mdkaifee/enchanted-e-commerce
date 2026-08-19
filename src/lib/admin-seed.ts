@@ -30,6 +30,14 @@ function isMissingMigrationError(error: { code?: string; message?: string } | nu
   );
 }
 
+function isAuthStorageError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    message.includes("database error querying schema") ||
+    message.includes("database error finding users")
+  );
+}
+
 function serviceErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (error && typeof error === "object" && "message" in error) {
@@ -71,7 +79,7 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
           ok: false,
           reason: "missing_migration",
           message:
-            "Supabase Auth returned a database schema error while creating the admin user. Delete any broken test@yopmail.com Auth user, run the repair SQL, then try again.",
+            "Supabase Auth returned a database error while creating the admin user. Run the latest reset admin Auth SQL, then sign in again.",
         };
       }
 
@@ -101,8 +109,10 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
           });
           return {
             ok: false,
-            reason: "failed",
-            message: `Could not list Supabase Auth users: ${listError.message}. Check APP_SUPABASE_SERVICE_ROLE_KEY.`,
+            reason: isAuthStorageError(listError) ? "missing_migration" : "failed",
+            message: isAuthStorageError(listError)
+              ? "Supabase Auth has a broken admin user record. Run the latest reset admin Auth SQL, then sign in again."
+              : `Could not list Supabase Auth users: ${listError.message}. Check APP_SUPABASE_SERVICE_ROLE_KEY.`,
           };
         }
 
