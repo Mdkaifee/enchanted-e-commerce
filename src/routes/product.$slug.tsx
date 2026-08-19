@@ -98,6 +98,7 @@ function ProductDetail() {
   }
 
   const fallbackImage = CATEGORY_IMAGES[product.category] ?? productImage(product);
+  const detailImage = displayImage || productImage(product);
 
   return (
     <div className="mx-auto max-w-7xl px-6 pt-10 pb-24">
@@ -110,15 +111,18 @@ function ProductDetail() {
       </nav>
 
       <div className="mt-8 grid gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)]">
-        <div className="rise-in overflow-hidden bg-secondary">
-          <div className="relative aspect-[4/5] min-h-[420px] overflow-hidden sm:aspect-[3/4] lg:min-h-[620px]">
+        <div className="overflow-hidden bg-secondary">
+          <div
+            className="relative aspect-[4/5] min-h-[420px] overflow-hidden bg-cover bg-center sm:aspect-[3/4] lg:min-h-[620px]"
+            style={{ backgroundImage: `url(${fallbackImage})` }}
+          >
             <img
-              src={displayImage || productImage(product)}
+              src={detailImage}
               alt={product.name}
               width={1200}
               height={1600}
               onError={() => setDisplayImage(fallbackImage)}
-              className="size-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
+              className="absolute inset-0 size-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
             />
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-background/75 to-transparent px-5 pt-5 pb-16 text-[10px] tracking-[0.22em] text-foreground uppercase">
               <span>{product.category}</span>
