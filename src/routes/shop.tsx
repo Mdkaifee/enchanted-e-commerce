@@ -6,7 +6,7 @@ import { CATEGORIES, productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
 
-type ShopSearch = { category?: string };
+type ShopSearch = { category?: string | undefined };
 
 export const Route = createFileRoute("/shop")({
   validateSearch: (search: Record<string, unknown>): ShopSearch => ({
