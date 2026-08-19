@@ -36,6 +36,7 @@ const keyOf = (l: { slug: string; size: string; color: string }) =>
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
@@ -43,16 +44,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (raw) setLines(JSON.parse(raw) as CartLine[]);
     } catch {
       /* ignore corrupt storage */
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
     } catch {
       /* ignore quota errors */
     }
-  }, [lines]);
+  }, [hydrated, lines]);
 
   const add = useCallback((line: Omit<CartLine, "qty">, qty = 1) => {
     setLines((prev) => {
