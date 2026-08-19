@@ -46,6 +46,23 @@ declare global {
   }
 }
 
+function checkoutErrorMessage(error: unknown, fallback = "Checkout could not start.") {
+  const message = error instanceof Error ? error.message : fallback;
+  try {
+    const parsed = JSON.parse(message) as unknown;
+    if (Array.isArray(parsed)) {
+      const issue = parsed.find(
+        (item): item is { path?: unknown[]; message?: string } =>
+          Boolean(item) && typeof item === "object" && "message" in item,
+      );
+      if (issue?.message) return issue.message;
+    }
+  } catch {
+    /* message was not JSON */
+  }
+  return message;
+}
+
 export const Route = createFileRoute("/cart")({
   head: () => ({
     meta: [
@@ -119,6 +136,22 @@ function CartPage() {
 
     setPlacing(true);
     try {
+      if (form.full_name.trim().length < 2) {
+        throw new Error("Full name must be at least 2 characters.");
+      }
+      if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+        throw new Error("Enter a valid email address.");
+      }
+      if (form.address.trim().length < 5) {
+        throw new Error("Address must be at least 5 characters.");
+      }
+      if (form.city.trim().length < 2) {
+        throw new Error("City must be at least 2 characters.");
+      }
+      if (form.postal_code.trim().length < 3) {
+        throw new Error("Postal code must be at least 3 characters.");
+      }
+
       const session = await getFreshSupabaseSession();
       if (!session) {
         setPlacing(false);
@@ -181,7 +214,7 @@ function CartPage() {
             toast.success("Payment verified. Your order is confirmed.");
             navigate({ to: "/order/$id", params: { id: paid.orderId } });
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Payment verification failed.");
+            toast.error(checkoutErrorMessage(error, "Payment verification failed."));
           } finally {
             setPlacing(false);
           }
@@ -197,7 +230,7 @@ function CartPage() {
       razorpay.open();
     } catch (error) {
       setPlacing(false);
-      const message = error instanceof Error ? error.message : "Checkout could not start.";
+      const message = checkoutErrorMessage(error);
       if (message.toLowerCase().includes("unauthorized")) {
         await signOut();
         toast.error("Your login expired. Please sign in again to checkout.");
