@@ -66,7 +66,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           </div>
         </div>
       </div>
-      <div className="mt-5 flex items-start justify-between gap-4">
+      <div className="mt-5 flex items-start justify-between gap-4 pb-4">
         <div>
           <h3 className="font-display text-base">{product.name}</h3>
           <p className="mt-1 text-xs tracking-wide text-muted-foreground">
