@@ -4,8 +4,6 @@ import { z } from "zod";
 import { calculateShipping, getShippingConfig } from "@/lib/shipping";
 
 const DEFAULT_SUPABASE_URL = "https://qrzaczktouanbpvogfzs.supabase.co";
-const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WBsqgeOyqbRxLsF8aBQwhA_05Yoxnzz";
-
 const accessTokenSchema = z
   .string()
   .min(1)
@@ -41,12 +39,11 @@ type RazorpayOrderResponse = {
   status: string;
 };
 
-type SupabaseAuthUserResponse = {
-  id?: string;
-};
-
 type SupabaseAccessTokenClaims = {
+  aud?: string;
+  exp?: number;
   iss?: string;
+  sub?: string;
 };
 
 function serverEnv(name: string) {
@@ -64,8 +61,7 @@ function decodeBase64Url(value: string) {
 
 function supabaseUrlFromToken(accessToken: string) {
   try {
-    const [, payload] = accessToken.split(".");
-    const claims = JSON.parse(decodeBase64Url(payload ?? "")) as SupabaseAccessTokenClaims;
+    const claims = claimsFromAccessToken(accessToken);
     const issuer = claims.iss;
     if (issuer?.startsWith("https://")) {
       return issuer.replace(/\/auth\/v1\/?$/, "");
@@ -76,18 +72,15 @@ function supabaseUrlFromToken(accessToken: string) {
   return undefined;
 }
 
-function serverSupabaseAuthEnv(accessToken: string) {
-  const tokenUrl = supabaseUrlFromToken(accessToken);
-  const envUrl = process.env["APP_PUBLIC_SUPABASE_URL"] ?? process.env["APP_SUPABASE_URL"];
-  const url = tokenUrl ?? envUrl ?? DEFAULT_SUPABASE_URL;
-  const publishableKey =
-    url === DEFAULT_SUPABASE_URL
-      ? DEFAULT_SUPABASE_PUBLISHABLE_KEY
-      : (process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
-        process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
-        DEFAULT_SUPABASE_PUBLISHABLE_KEY);
+function claimsFromAccessToken(accessToken: string) {
+  const [, payload] = accessToken.split(".");
+  return JSON.parse(decodeBase64Url(payload ?? "")) as SupabaseAccessTokenClaims;
+}
 
-  return { envUrl, tokenUrl, url, publishableKey };
+function isUuid(value: string | undefined) {
+  return Boolean(
+    value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+  );
 }
 
 function encodeBasicAuth(user: string, password: string) {
@@ -128,42 +121,47 @@ function constantTimeEqual(left: string, right: string) {
   return result === 0;
 }
 
-async function getAuthenticatedUserId(accessToken: string) {
-  const { envUrl, tokenUrl, url, publishableKey } = serverSupabaseAuthEnv(accessToken);
+function getAuthenticatedUserId(accessToken: string) {
+  try {
+    const claims = claimsFromAccessToken(accessToken);
+    const tokenUrl = supabaseUrlFromToken(accessToken);
+    const allowedUrls = new Set(
+      [
+        DEFAULT_SUPABASE_URL,
+        process.env["APP_PUBLIC_SUPABASE_URL"],
+        process.env["APP_SUPABASE_URL"],
+      ]
+        .filter(Boolean)
+        .map((url) => url!.replace(/\/$/, "")),
+    );
 
-  const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, {
-    method: "GET",
-    headers: {
-      apikey: publishableKey,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    if (!tokenUrl || !allowedUrls.has(tokenUrl.replace(/\/$/, ""))) {
+      console.error("[Checkout auth] Token issuer is not allowed", { tokenUrl });
+      throw new Error("Invalid token issuer.");
+    }
+    if (claims.aud !== "authenticated") {
+      console.error("[Checkout auth] Token audience is not authenticated", { aud: claims.aud });
+      throw new Error("Invalid token audience.");
+    }
+    if (!claims.exp || claims.exp <= Math.floor(Date.now() / 1000)) {
+      console.error("[Checkout auth] Token is expired");
+      throw new Error("Expired token.");
+    }
+    if (!isUuid(claims.sub)) {
+      console.error("[Checkout auth] Token subject is missing or invalid");
+      throw new Error("Invalid token subject.");
+    }
 
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("[Checkout auth] Supabase rejected checkout token", {
-      status: response.status,
-      statusText: response.statusText,
-      envUrl,
-      tokenUrl,
-      supabaseUrl: url,
-      body: body.slice(0, 300),
-    });
+    return claims.sub!;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Invalid token")) {
+      throw new Error("Please sign in again to checkout.");
+    }
+    if (error instanceof Error && error.message === "Expired token.") {
+      throw new Error("Please sign in again to checkout.");
+    }
     throw new Error("Please sign in again to checkout.");
   }
-
-  const user = (await response.json()) as SupabaseAuthUserResponse;
-  if (!user.id) {
-    console.error("[Checkout auth] Supabase rejected checkout token", {
-      envUrl,
-      tokenUrl,
-      supabaseUrl: url,
-      body: "User response did not include an id.",
-    });
-    throw new Error("Please sign in again to checkout.");
-  }
-
-  return user.id;
 }
 
 export const createCheckoutOrder = createServerFn({ method: "POST" })
