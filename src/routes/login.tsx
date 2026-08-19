@@ -12,10 +12,18 @@ type LoginSearch = { redirect?: string | undefined };
 
 function authErrorMessage(error: Error) {
   if (error.message.toLowerCase().includes("database error querying schema")) {
-    return "Supabase database schema is not ready. Apply the latest migrations, then sign in again.";
+    return "Supabase Auth could not sign in this account. Repair the admin Auth user, then try again.";
   }
 
   return error.message;
+}
+
+function canAttemptAdminRepair(error: Error) {
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("invalid login credentials") ||
+    message.includes("database error querying schema")
+  );
 }
 
 export const Route = createFileRoute("/login")({
@@ -46,11 +54,7 @@ function Login() {
 
     const isAdminLogin = email.trim().toLowerCase() === "test@yopmail.com";
 
-    if (
-      error &&
-      isAdminLogin &&
-      error.message.toLowerCase().includes("invalid login credentials")
-    ) {
+    if (error && isAdminLogin && canAttemptAdminRepair(error)) {
       const seedResult = await seedAdmin({ data: { email, password } });
       if (seedResult.ok) {
         ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
