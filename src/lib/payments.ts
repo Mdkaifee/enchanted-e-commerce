@@ -46,6 +46,11 @@ type SupabaseAccessTokenClaims = {
   sub?: string;
 };
 
+type CheckoutTrace = {
+  traceId: string;
+  userId?: string;
+};
+
 function serverEnv(name: string) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing server environment variable: ${name}`);
@@ -121,8 +126,40 @@ function constantTimeEqual(left: string, right: string) {
   return result === 0;
 }
 
-function checkoutServiceError(message: string, error: unknown): never {
-  console.error(`[Checkout] ${message}`, error);
+function createTrace(): CheckoutTrace {
+  return {
+    traceId: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : String(Date.now()),
+  };
+}
+
+function errorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      cause: error.cause,
+      stack: error.stack,
+    };
+  }
+
+  return { message: String(error) };
+}
+
+function truncateLogValue(value: string, maxLength = 2000) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}... [truncated ${value.length - maxLength} chars]`;
+}
+
+function checkoutServiceError(
+  step: string,
+  message: string,
+  error: unknown,
+  trace: CheckoutTrace,
+): never {
+  console.error(`[Checkout:${step}] ${message}`, {
+    trace,
+    error: errorDetails(error),
+  });
   throw new Error(message);
 }
 
@@ -170,28 +207,47 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    const trace = createTrace();
     const keyId = serverEnv("RAZORPAY_KEY_ID");
     const keySecret = serverEnv("RAZORPAY_KEY_SECRET");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const userId = await getAuthenticatedUserId(data.accessToken);
+    trace.userId = userId;
     const slugs = Array.from(new Set(data.lines.map((line) => line.slug)));
+
+    console.info("[Checkout] Starting order creation", {
+      trace,
+      lineCount: data.lines.length,
+      slugs,
+      hasRazorpayKeyId: Boolean(keyId),
+      hasRazorpayKeySecret: Boolean(keySecret),
+      supabaseUrl: DEFAULT_SUPABASE_URL,
+    });
 
     let productResult;
     try {
+      console.info("[Checkout:SupabaseProducts] Querying products", { trace, slugs });
       productResult = await supabaseAdmin
         .from("products")
         .select("id, slug, name, price, image_url, category, colors, sizes")
         .in("slug", slugs);
     } catch (error) {
-      checkoutServiceError("Could not reach the product database. Please try again.", error);
+      checkoutServiceError(
+        "SupabaseProducts",
+        "Could not reach the product database. Please try again.",
+        error,
+        trace,
+      );
     }
 
     const { data: products, error: productsError } = productResult;
 
     if (productsError) {
       checkoutServiceError(
+        "SupabaseProducts",
         "Could not load products for checkout. Please try again.",
         productsError,
+        trace,
       );
     }
     if (!products || products.length !== slugs.length) {
@@ -226,6 +282,12 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
 
     let orderResult;
     try {
+      console.info("[Checkout:SupabaseOrderInsert] Creating pending order", {
+        trace,
+        subtotal,
+        shipping,
+        total,
+      });
       orderResult = await supabaseAdmin
         .from("orders")
         .insert({
@@ -239,17 +301,33 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
         .select("id")
         .single();
     } catch (error) {
-      checkoutServiceError("Could not create your order. Please try again.", error);
+      checkoutServiceError(
+        "SupabaseOrderInsert",
+        "Could not create your order. Please try again.",
+        error,
+        trace,
+      );
     }
 
     const { data: order, error: orderError } = orderResult;
 
     if (orderError) {
-      checkoutServiceError("Could not create your order. Please try again.", orderError);
+      checkoutServiceError(
+        "SupabaseOrderInsert",
+        "Could not create your order. Please try again.",
+        orderError,
+        trace,
+      );
     }
 
     let razorpayResponse;
     try {
+      console.info("[Checkout:RazorpayFetch] Creating Razorpay order", {
+        trace,
+        orderId: order.id,
+        amount: toPaise(total),
+        currency: "INR",
+      });
       razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
         method: "POST",
         headers: {
@@ -267,15 +345,54 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
         }),
       });
     } catch (error) {
-      checkoutServiceError(
-        "Razorpay checkout could not be reached. Please try again shortly.",
-        error,
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[Razorpay] Fetch itself failed", {
+        trace,
+        error: errorDetails(error),
+        message,
+        cause: error instanceof Error ? error.cause : undefined,
+      });
+
+      throw new Error(
+        `Razorpay checkout network failed: ${message || "Please try again shortly."}`,
       );
     }
 
+    console.info("[Checkout:RazorpayResponse] Razorpay order response received", {
+      trace,
+      status: razorpayResponse.status,
+      statusText: razorpayResponse.statusText,
+      ok: razorpayResponse.ok,
+    });
+
     if (!razorpayResponse.ok) {
-      await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
-      throw new Error("Razorpay could not start this checkout. Please try again.");
+      const body = truncateLogValue(await razorpayResponse.text());
+
+      console.error("[Razorpay] Order creation failed", {
+        trace,
+        status: razorpayResponse.status,
+        statusText: razorpayResponse.statusText,
+        body,
+      });
+
+      const { error: markFailedError } = await supabaseAdmin
+        .from("orders")
+        .update({ status: "failed" })
+        .eq("id", order.id);
+
+      if (markFailedError) {
+        console.error("[Checkout:SupabaseOrderFailedUpdate] Could not mark order failed", {
+          trace,
+          orderId: order.id,
+          error: markFailedError,
+        });
+      }
+
+      throw new Error(
+        `Razorpay order failed (${razorpayResponse.status}): ${
+          body || razorpayResponse.statusText
+        }`,
+      );
     }
 
     const razorpayOrder = (await razorpayResponse.json()) as RazorpayOrderResponse;
@@ -286,7 +403,12 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       .eq("id", order.id);
 
     if (updateError) {
-      checkoutServiceError("Could not save your Razorpay order. Please try again.", updateError);
+      checkoutServiceError(
+        "SupabaseRazorpayOrderUpdate",
+        "Could not save your Razorpay order. Please try again.",
+        updateError,
+        trace,
+      );
     }
 
     return {
@@ -301,12 +423,19 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
   .validator(verifyPaymentSchema)
   .handler(async ({ data }) => {
+    const trace = createTrace();
     const keySecret = serverEnv("RAZORPAY_KEY_SECRET");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const userId = await getAuthenticatedUserId(data.accessToken);
+    trace.userId = userId;
 
     let orderResult;
     try {
+      console.info("[PaymentVerify:SupabaseOrderLookup] Loading order", {
+        trace,
+        orderId: data.orderId,
+        razorpayOrderId: data.razorpayOrderId,
+      });
       orderResult = await supabaseAdmin
         .from("orders")
         .select("id, user_id, status, razorpay_order_id")
@@ -314,7 +443,12 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .single();
     } catch (error) {
-      checkoutServiceError("Could not find this order for payment verification.", error);
+      checkoutServiceError(
+        "PaymentVerifyOrderLookup",
+        "Could not find this order for payment verification.",
+        error,
+        trace,
+      );
     }
 
     const { data: order, error: orderError } = orderResult;
@@ -336,6 +470,10 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
 
     let paidOrderResult;
     try {
+      console.info("[PaymentVerify:SupabasePaidUpdate] Marking order paid", {
+        trace,
+        orderId: data.orderId,
+      });
       paidOrderResult = await supabaseAdmin
         .from("orders")
         .update({
@@ -349,7 +487,12 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         .select("id")
         .single();
     } catch (error) {
-      checkoutServiceError("Could not mark this order paid. Please contact support.", error);
+      checkoutServiceError(
+        "PaymentVerifyPaidUpdate",
+        "Could not mark this order paid. Please contact support.",
+        error,
+        trace,
+      );
     }
 
     const { data: paidOrder, error: updateError } = paidOrderResult;
