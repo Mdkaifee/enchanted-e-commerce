@@ -8,6 +8,48 @@ export type Database = {
   };
   public: {
     Tables: {
+      cart_items: {
+        Row: {
+          color: string;
+          created_at: string;
+          id: string;
+          image: string;
+          name: string;
+          price: number;
+          qty: number;
+          size: string;
+          slug: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          color: string;
+          created_at?: string;
+          id?: string;
+          image: string;
+          name: string;
+          price: number;
+          qty: number;
+          size: string;
+          slug: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          color?: string;
+          created_at?: string;
+          id?: string;
+          image?: string;
+          name?: string;
+          price?: number;
+          qty?: number;
+          size?: string;
+          slug?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       orders: {
         Row: {
           address: string;

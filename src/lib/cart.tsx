@@ -4,9 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 
 export type CartLine = {
   slug: string;
@@ -30,13 +34,77 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "md-attire-cart";
+const STORAGE_OWNER_KEY = "md-attire-cart-owner";
 
 const keyOf = (l: { slug: string; size: string; color: string }) =>
   `${l.slug}|${l.size}|${l.color}`;
 
+function mergeCartLines(primary: CartLine[], secondary: CartLine[]) {
+  const byKey = new Map<string, CartLine>();
+
+  for (const line of primary) {
+    byKey.set(keyOf(line), line);
+  }
+
+  for (const line of secondary) {
+    const key = keyOf(line);
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? { ...existing, qty: existing.qty + line.qty } : line);
+  }
+
+  return Array.from(byKey.values());
+}
+
+function cartLineFromRow(row: {
+  slug: string;
+  name: string;
+  price: number;
+  size: string;
+  color: string;
+  image: string;
+  qty: number;
+}): CartLine {
+  return {
+    slug: row.slug,
+    name: row.name,
+    price: Number(row.price),
+    size: row.size,
+    color: row.color,
+    image: row.image,
+    qty: row.qty,
+  };
+}
+
+async function replaceRemoteCart(userId: string, nextLines: CartLine[]) {
+  const { error: deleteError } = await supabase.from("cart_items").delete().eq("user_id", userId);
+  if (deleteError) throw deleteError;
+
+  if (nextLines.length === 0) return;
+
+  const { error: insertError } = await supabase.from("cart_items").insert(
+    nextLines.map((line) => ({
+      user_id: userId,
+      slug: line.slug,
+      name: line.name,
+      price: line.price,
+      size: line.size,
+      color: line.color,
+      image: line.image,
+      qty: line.qty,
+      updated_at: new Date().toISOString(),
+    })),
+  );
+
+  if (insertError) throw insertError;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [remoteUserId, setRemoteUserId] = useState<string | null>(null);
+  const [remoteHydrating, setRemoteHydrating] = useState(false);
+  const linesRef = useRef<CartLine[]>([]);
 
   useEffect(() => {
     try {
@@ -50,13 +118,83 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    linesRef.current = lines;
+  }, [lines]);
+
+  useEffect(() => {
+    if (!hydrated || loading) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
+      localStorage.setItem(STORAGE_OWNER_KEY, user?.id ?? "guest");
     } catch {
       /* ignore quota errors */
     }
-  }, [hydrated, lines]);
+  }, [hydrated, lines, loading, user?.id]);
+
+  useEffect(() => {
+    if (!hydrated || loading) return;
+
+    const userId = user?.id;
+    if (!userId) {
+      setRemoteUserId(null);
+      setRemoteHydrating(false);
+      return;
+    }
+
+    let active = true;
+
+    async function syncInitialRemoteCart() {
+      setRemoteHydrating(true);
+      try {
+        const localOwner = localStorage.getItem(STORAGE_OWNER_KEY);
+        const localLines = linesRef.current;
+
+        const { data, error } = await supabase
+          .from("cart_items")
+          .select("slug, name, price, size, color, image, qty")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true });
+
+        if (error) throw error;
+        if (!active) return;
+
+        const remoteLines = (data ?? []).map(cartLineFromRow);
+        const nextLines =
+          localOwner === userId
+            ? remoteLines.length > 0
+              ? remoteLines
+              : localLines
+            : mergeCartLines(remoteLines, localLines);
+
+        setLines(nextLines);
+        setRemoteUserId(userId);
+        await replaceRemoteCart(userId, nextLines);
+      } catch (error) {
+        console.error("[Cart] Could not sync saved cart", error);
+        if (active) setRemoteUserId(userId);
+      } finally {
+        if (active) setRemoteHydrating(false);
+      }
+    }
+
+    syncInitialRemoteCart();
+
+    return () => {
+      active = false;
+    };
+  }, [hydrated, loading, user?.id]);
+
+  useEffect(() => {
+    if (!hydrated || loading || !user?.id || remoteHydrating || remoteUserId !== user.id) return;
+
+    const timeout = window.setTimeout(() => {
+      replaceRemoteCart(user.id, linesRef.current).catch((error) => {
+        console.error("[Cart] Could not save cart", error);
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [hydrated, lines, loading, remoteHydrating, remoteUserId, user?.id]);
 
   const add = useCallback((line: Omit<CartLine, "qty">, qty = 1) => {
     setLines((prev) => {
