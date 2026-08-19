@@ -43,13 +43,13 @@ function Login() {
   const seedAdmin = useServerFn(ensureAdminAccount);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [adminSeedMissing, setAdminSeedMissing] = useState(false);
+  const [adminSeedError, setAdminSeedError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    setAdminSeedMissing(false);
+    setAdminSeedError("");
     let { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     const isAdminLogin = email.trim().toLowerCase() === "test@yopmail.com";
@@ -60,7 +60,7 @@ function Login() {
         ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
       } else {
         setSubmitting(false);
-        setAdminSeedMissing(true);
+        setAdminSeedError(seedResult.message);
         toast.error(seedResult.message);
         return;
       }
@@ -104,11 +104,9 @@ function Login() {
       <form onSubmit={onSubmit} className="rise-in mt-10 space-y-4">
         <Field label="Email" type="email" value={email} onChange={setEmail} />
         <PasswordField label="Password" value={password} onChange={setPassword} />
-        {adminSeedMissing && (
+        {adminSeedError && (
           <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-relaxed text-destructive">
-            Admin auto-seed could not finish. Check Lovable Cloud secrets for{" "}
-            <span className="font-medium">APP_SUPABASE_SERVICE_ROLE_KEY</span> and make sure the
-            latest database migrations are applied.
+            {adminSeedError}
           </div>
         )}
         <button

@@ -9,6 +9,13 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
 
+function isSupabaseAuthRequest(input: RequestInfo | URL) {
+  const url =
+    typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+  return url.includes("/auth/v1/");
+}
+
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
   return (input, init) => {
     const headers = new Headers(
@@ -22,6 +29,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
     // New Supabase API keys are opaque strings, not bearer JWTs.
     if (
       isNewSupabaseApiKey(supabaseKey) &&
+      !isSupabaseAuthRequest(input) &&
       headers.get("Authorization") === `Bearer ${supabaseKey}`
     ) {
       headers.delete("Authorization");

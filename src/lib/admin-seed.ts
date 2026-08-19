@@ -30,6 +30,14 @@ function isMissingMigrationError(error: { code?: string; message?: string } | nu
   );
 }
 
+function serviceErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message);
+  }
+  return String(error);
+}
+
 export const ensureAdminAccount = createServerFn({ method: "POST" })
   .validator(adminSeedSchema)
   .handler(async ({ data }): Promise<AdminSeedResult> => {
@@ -45,6 +53,7 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       let userId: string | undefined;
+      console.info("[AdminSeed] Creating or repairing admin Auth user");
       const createResult = await supabaseAdmin.auth.admin.createUser({
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
@@ -53,27 +62,55 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
       });
 
       if (createResult.error && isMissingMigrationError(createResult.error)) {
+        console.error("[AdminSeed] Supabase Auth schema error during createUser", {
+          message: createResult.error.message,
+          status: createResult.error.status,
+          code: createResult.error.code,
+        });
         return {
           ok: false,
           reason: "missing_migration",
           message:
-            "Supabase Auth could not query the database schema. Apply the latest database migrations, then sign in again.",
+            "Supabase Auth returned a database schema error while creating the admin user. Delete any broken test@yopmail.com Auth user, run the repair SQL, then try again.",
         };
       }
 
       if (createResult.data.user) {
         userId = createResult.data.user.id;
       } else {
+        if (createResult.error) {
+          console.info(
+            "[AdminSeed] createUser did not create a new user; looking for existing user",
+            {
+              message: createResult.error.message,
+              status: createResult.error.status,
+              code: createResult.error.code,
+            },
+          );
+        }
+
         const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
           page: 1,
           perPage: 1000,
         });
         if (listError) {
-          return { ok: false, reason: "failed", message: listError.message };
+          console.error("[AdminSeed] Could not list Auth users", {
+            message: listError.message,
+            status: listError.status,
+            code: listError.code,
+          });
+          return {
+            ok: false,
+            reason: "failed",
+            message: `Could not list Supabase Auth users: ${listError.message}. Check APP_SUPABASE_SERVICE_ROLE_KEY.`,
+          };
         }
 
         const existing = users.users.find((user) => user.email?.toLowerCase() === ADMIN_EMAIL);
         if (!existing) {
+          console.error("[AdminSeed] Admin user was not created and not found", {
+            createError: createResult.error?.message,
+          });
           return {
             ok: false,
             reason: "failed",
@@ -82,21 +119,34 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
         }
 
         userId = existing.id;
+        console.info("[AdminSeed] Updating existing admin Auth user", { userId });
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
           password: ADMIN_PASSWORD,
           email_confirm: true,
           user_metadata: { full_name: "MD Attire Admin" },
         });
         if (updateError) {
-          return { ok: false, reason: "failed", message: updateError.message };
+          console.error("[AdminSeed] Could not update admin Auth user", {
+            userId,
+            message: updateError.message,
+            status: updateError.status,
+            code: updateError.code,
+          });
+          return {
+            ok: false,
+            reason: "failed",
+            message: `Could not update admin Auth user: ${updateError.message}. Check APP_SUPABASE_SERVICE_ROLE_KEY or recreate test@yopmail.com in Supabase Auth.`,
+          };
         }
       }
 
+      console.info("[AdminSeed] Upserting admin role", { userId });
       const { error: roleError } = await supabaseAdmin
         .from("user_roles")
         .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
 
       if (roleError) {
+        console.error("[AdminSeed] Could not upsert admin role", roleError);
         return {
           ok: false,
           reason: isMissingMigrationError(roleError) ? "missing_migration" : "failed",
@@ -106,8 +156,14 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
         };
       }
 
+      console.info("[AdminSeed] Admin repair complete", { userId });
       return { ok: true };
     } catch (error) {
+      console.error("[AdminSeed] Admin repair crashed", {
+        message: serviceErrorMessage(error),
+        error,
+      });
+
       if (isMissingServiceRoleError(error)) {
         return {
           ok: false,
