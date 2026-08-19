@@ -7,10 +7,8 @@ import { toast } from "sonner";
 
 import {
   CATEGORIES,
-  categoryImage,
   formatPrice,
   productCategories,
-  productImage,
   productsQuery,
   type Product,
 } from "@/lib/catalog";
@@ -127,7 +125,7 @@ function ProductsAdmin() {
   const { data: products = [], isLoading } = useQuery(productsQuery);
   const [form, setForm] = useState<ProductForm>(emptyProduct);
   const categories = productCategories(products);
-  const imagePreview = form.image_url.trim() || categoryImage(form.category, products);
+  const imagePreview = form.image_url.trim();
 
   const uploadImage = useMutation({
     mutationFn: async (file: File) => {
@@ -367,15 +365,21 @@ function ProductsAdmin() {
               Current image
             </span>
             <div className="mt-2 grid grid-cols-[88px_1fr] items-center gap-3 border border-border p-2">
-              <img
-                src={imagePreview}
-                alt=""
-                className="aspect-square w-full bg-secondary object-cover"
-              />
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt=""
+                  className="aspect-square w-full bg-secondary object-cover"
+                />
+              ) : (
+                <div className="grid aspect-square w-full place-items-center bg-secondary text-center text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+                  No image
+                </div>
+              )}
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {form.image_url.trim()
                   ? "Using the saved product image URL."
-                  : "Image URL is optional. Blank products use the category/default image."}
+                  : "No product image is saved yet. Upload an image or paste an image URL."}
               </p>
             </div>
           </div>
@@ -701,7 +705,7 @@ function productToForm(product: Product): ProductForm {
     colors: product.colors.join(", "),
     color_images: formatColorImages(product.color_images),
     sizes: product.sizes.join(", "),
-    image_url: product.image_url || productImage(product),
+    image_url: product.image_url,
     badge: product.badge ?? "",
     featured: product.featured,
   };
