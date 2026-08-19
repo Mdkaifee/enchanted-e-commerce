@@ -22,14 +22,24 @@ function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [adminSeedMissing, setAdminSeedMissing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setAdminSeedMissing(false);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setSubmitting(false);
     if (error) {
+      if (
+        email.trim().toLowerCase() === "test@yopmail.com" &&
+        error.message.toLowerCase().includes("invalid login credentials")
+      ) {
+        setAdminSeedMissing(true);
+        toast.error("Admin account is not seeded in Supabase Auth yet.");
+        return;
+      }
       toast.error(error.message);
       return;
     }
@@ -63,6 +73,12 @@ function Login() {
       <form onSubmit={onSubmit} className="rise-in mt-10 space-y-4">
         <Field label="Email" type="email" value={email} onChange={setEmail} />
         <PasswordField label="Password" value={password} onChange={setPassword} />
+        {adminSeedMissing && (
+          <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-relaxed text-destructive">
+            The admin email exists in the app config, but it has not been created in the connected
+            Supabase Auth database yet. Apply the latest Supabase migrations, then sign in again.
+          </div>
+        )}
         <button
           type="submit"
           disabled={submitting}
