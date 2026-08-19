@@ -51,7 +51,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           />
         </button>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-foreground/90 py-4 text-center text-[11px] tracking-[0.24em] text-background uppercase transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-y-0">
-          View piece
+          View details
         </div>
       </div>
       <div className="mt-5 flex items-start justify-between gap-4">
