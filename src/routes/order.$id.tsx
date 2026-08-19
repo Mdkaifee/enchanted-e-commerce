@@ -18,6 +18,13 @@ type OrderLine = {
   qty: number;
 };
 
+const fulfillmentLabels: Record<string, string> = {
+  processing: "Preparing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
 export const Route = createFileRoute("/order/$id")({
   head: () => ({
     meta: [{ title: "Order details — MD Attire" }],
@@ -84,7 +91,7 @@ function OrderDetail() {
         <StatusBlock
           icon={<PackageCheck className="size-5" />}
           label="Fulfillment"
-          value={order.fulfillment_status}
+          value={fulfillmentLabels[order.fulfillment_status] ?? order.fulfillment_status}
         />
         <StatusBlock
           icon={<CheckCircle2 className="size-5" />}

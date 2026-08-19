@@ -6,6 +6,19 @@ import { useAuth, useRequireAuth } from "@/lib/auth";
 import { myOrdersQuery } from "@/lib/orders";
 import { formatPrice } from "@/lib/catalog";
 
+const fulfillmentLabels: Record<string, string> = {
+  processing: "Preparing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+const paymentLabels: Record<string, string> = {
+  pending: "Payment pending",
+  paid: "Paid",
+  failed: "Payment failed",
+};
+
 export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [{ title: "Your account — MD Attire" }],
@@ -94,7 +107,14 @@ function Account() {
                 </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {new Date(order.created_at).toLocaleDateString()} ·{" "}
-                  <span className="capitalize">{order.status}</span>
+                  {paymentLabels[order.status] ?? order.status}
+                  {order.status === "paid" && (
+                    <>
+                      {" "}
+                      · Delivery:{" "}
+                      {fulfillmentLabels[order.fulfillment_status] ?? order.fulfillment_status}
+                    </>
+                  )}
                 </p>
               </div>
               <span className="text-sm">{formatPrice(order.total)}</span>

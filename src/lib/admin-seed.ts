@@ -22,7 +22,12 @@ function isMissingServiceRoleError(error: unknown) {
 }
 
 function isMissingMigrationError(error: { code?: string; message?: string } | null) {
-  return error?.code === "42P01" || error?.message?.includes("user_roles") === true;
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "42P01" ||
+    message.includes("user_roles") ||
+    message.includes("database error querying schema")
+  );
 }
 
 export const ensureAdminAccount = createServerFn({ method: "POST" })
@@ -46,6 +51,15 @@ export const ensureAdminAccount = createServerFn({ method: "POST" })
         email_confirm: true,
         user_metadata: { full_name: "MD Attire Admin" },
       });
+
+      if (createResult.error && isMissingMigrationError(createResult.error)) {
+        return {
+          ok: false,
+          reason: "missing_migration",
+          message:
+            "Supabase Auth could not query the database schema. Apply the latest database migrations, then sign in again.",
+        };
+      }
 
       if (createResult.data.user) {
         userId = createResult.data.user.id;

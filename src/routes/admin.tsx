@@ -28,6 +28,19 @@ type ProductForm = {
 type AdminTab = "products" | "orders" | "messages";
 type ContactMessage = Tables<"contact_messages">;
 
+const fulfillmentOptions = [
+  { value: "processing", label: "Preparing" },
+  { value: "shipped", label: "Shipped" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const paymentLabels: Record<string, string> = {
+  pending: "Payment pending",
+  paid: "Paid",
+  failed: "Payment failed",
+};
+
 const emptyProduct: ProductForm = {
   slug: "",
   name: "",
@@ -357,25 +370,31 @@ function OrdersAdmin() {
                     <p>{order.full_name}</p>
                     <p className="text-xs text-muted-foreground">{order.email}</p>
                   </td>
-                  <td className="py-4 pr-4 capitalize">{order.status}</td>
+                  <td className="py-4 pr-4">{paymentLabels[order.status] ?? order.status}</td>
                   <td className="py-4 pr-4">{formatPrice(order.total)}</td>
                   <td className="py-4 pr-4">
                     <select
                       value={order.fulfillment_status}
+                      disabled={order.status !== "paid" || updateOrder.isPending}
                       onChange={(event) =>
                         updateOrder.mutate({
                           id: order.id,
                           fulfillment_status: event.target.value,
                         })
                       }
-                      className="border border-border bg-background px-3 py-2 text-xs capitalize outline-none focus:border-primary"
+                      className="border border-border bg-background px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-50"
                     >
-                      {["processing", "shipped", "delivered", "cancelled"].map((status) => (
-                        <option key={status} value={status}>
-                          {status}
+                      {fulfillmentOptions.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
                         </option>
                       ))}
                     </select>
+                    {order.status !== "paid" && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Fulfillment starts after payment.
+                      </p>
+                    )}
                   </td>
                 </tr>
               ))}

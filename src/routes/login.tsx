@@ -10,6 +10,14 @@ import { useServerFn } from "@tanstack/react-start";
 
 type LoginSearch = { redirect?: string | undefined };
 
+function authErrorMessage(error: Error) {
+  if (error.message.toLowerCase().includes("database error querying schema")) {
+    return "Supabase database schema is not ready. Apply the latest migrations, then sign in again.";
+  }
+
+  return error.message;
+}
+
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
@@ -56,7 +64,7 @@ function Login() {
 
     setSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(authErrorMessage(error));
       return;
     }
 
