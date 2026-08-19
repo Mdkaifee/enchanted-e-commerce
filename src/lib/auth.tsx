@@ -8,6 +8,7 @@ type AuthContextValue = {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  adminLoading: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 };
@@ -71,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       session,
       isAdmin: isAdmin === true,
-      loading: loading || isAdmin === null,
+      adminLoading: Boolean(session?.user) && isAdmin === null,
+      loading,
       signOut: async () => {
         await supabase.auth.signOut();
       },
@@ -105,17 +107,17 @@ export function useRequireAuth() {
 
 /** Redirects home if signed out or not an admin, once the session has finished loading. */
 export function useRequireAdmin() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, adminLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || adminLoading) return;
     if (!user) {
       navigate({ to: "/login", search: { redirect: "/admin" } });
     } else if (!isAdmin) {
       navigate({ to: "/" });
     }
-  }, [loading, user, isAdmin, navigate]);
+  }, [loading, adminLoading, user, isAdmin, navigate]);
 
-  return { ready: !loading && Boolean(user) && isAdmin };
+  return { ready: !loading && !adminLoading && Boolean(user) && isAdmin };
 }

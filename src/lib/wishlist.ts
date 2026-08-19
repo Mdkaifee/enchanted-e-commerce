@@ -32,6 +32,7 @@ export function useWishlist() {
       return new Set((data ?? []).map((row) => row.product_id));
     },
     enabled: Boolean(userId),
+    staleTime: 30_000,
   });
 
   const toggle = useMutation({
@@ -70,7 +71,7 @@ export function useWishlist() {
 
   return {
     productIds: query.data ?? new Set<string>(),
-    isLoading: loading || (Boolean(userId) && (query.isLoading || query.isFetching)),
+    isLoading: loading || (Boolean(userId) && query.isPending),
     isSaved: (productId: string) => query.data?.has(productId) ?? false,
     toggle: toggle.mutate,
     isToggling: toggle.isPending,
