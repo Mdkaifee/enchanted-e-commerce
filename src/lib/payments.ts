@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import type { Database } from "@/integrations/supabase/types";
 import { calculateShipping, getShippingConfig } from "@/lib/shipping";
+
+const DEFAULT_SUPABASE_URL = "https://qrzaczktouanbpvogfzs.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WBsqgeOyqbRxLsF8aBQwhA_05Yoxnzz";
 
 const accessTokenSchema = z
   .string()
@@ -44,6 +49,19 @@ function serverEnv(name: string) {
   return value;
 }
 
+function serverSupabaseAuthEnv() {
+  const url =
+    process.env["APP_PUBLIC_SUPABASE_URL"] ??
+    process.env["APP_SUPABASE_URL"] ??
+    DEFAULT_SUPABASE_URL;
+  const publishableKey =
+    process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
+    DEFAULT_SUPABASE_PUBLISHABLE_KEY;
+
+  return { url, publishableKey };
+}
+
 function encodeBasicAuth(user: string, password: string) {
   const raw = `${user}:${password}`;
   if (typeof btoa === "function") return btoa(raw);
@@ -83,10 +101,23 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 async function getAuthenticatedUserId(accessToken: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+  const { url, publishableKey } = serverSupabaseAuthEnv();
+  const supabaseAuth = createClient<Database>(url, publishableKey, {
+    auth: {
+      storage: undefined,
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  const { data, error } = await supabaseAuth.auth.getUser(accessToken);
 
   if (error || !data.user?.id) {
+    console.error("[Checkout auth] Supabase rejected checkout token", {
+      message: error?.message,
+      status: error?.status,
+      supabaseUrl: url,
+    });
     throw new Error("Please sign in again to checkout.");
   }
 
