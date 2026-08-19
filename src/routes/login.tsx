@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/login")({
 function Login() {
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const seedAdmin = useServerFn(ensureAdminAccount);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,6 +59,9 @@ function Login() {
       toast.error(error.message);
       return;
     }
+
+    await queryClient.invalidateQueries({ queryKey: ["wishlist"] });
+    await queryClient.invalidateQueries({ queryKey: ["orders"] });
 
     if (!redirect && data.user) {
       const { data: role } = await supabase

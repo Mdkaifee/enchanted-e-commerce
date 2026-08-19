@@ -16,7 +16,7 @@ function isMissingWishlistTable(error: { code?: string; message?: string }) {
 }
 
 export function useWishlist() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const userId = user?.id;
 
@@ -70,7 +70,7 @@ export function useWishlist() {
 
   return {
     productIds: query.data ?? new Set<string>(),
-    isLoading: query.isLoading,
+    isLoading: loading || (Boolean(userId) && (query.isLoading || query.isFetching)),
     isSaved: (productId: string) => query.data?.has(productId) ?? false,
     toggle: toggle.mutate,
     isToggling: toggle.isPending,

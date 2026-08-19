@@ -8,6 +8,16 @@ import { productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
 
+function WishlistSkeleton() {
+  return (
+    <div className="mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="aspect-[3/4] animate-pulse bg-secondary" />
+      ))}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/wishlist")({
   head: () => ({
     meta: [{ title: "Your wishlist — MD Attire" }],
@@ -42,11 +52,7 @@ function Wishlist() {
       <h1 className="rise-in mt-4 font-display text-5xl font-light">Your wishlist</h1>
 
       {isLoading ? (
-        <div className="mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="aspect-[3/4] animate-pulse bg-secondary" />
-          ))}
-        </div>
+        <WishlistSkeleton />
       ) : saved.length === 0 ? (
         <div className="mt-20 text-center">
           <p className="text-sm text-muted-foreground">Nothing saved yet.</p>
