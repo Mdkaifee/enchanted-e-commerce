@@ -67,6 +67,11 @@ const emptyProduct: ProductForm = {
   featured: false,
 };
 
+type ColorImageUpload = {
+  color: string;
+  file: File;
+};
+
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [{ title: "Admin — MD Attire" }],
@@ -126,33 +131,42 @@ function ProductsAdmin() {
 
   const uploadImage = useMutation({
     mutationFn: async (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        throw new Error("Upload an image file.");
-      }
-
-      if (file.size > MAX_PRODUCT_IMAGE_SIZE) {
-        throw new Error("Image must be 5 MB or smaller.");
-      }
-
-      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const baseName = slugify(form.slug || form.name || "product") || "product";
-      const path = `products/${baseName}-${Date.now()}.${extension}`;
-
-      const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
-        cacheControl: "31536000",
-        contentType: file.type,
-        upsert: false,
-      });
-
-      if (error) throw error;
-
-      const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
-      if (!data.publicUrl) throw new Error("Could not create image URL.");
-      return data.publicUrl;
+      return uploadProductImage(file, `${baseName}-main`);
     },
     onSuccess: (image_url) => {
       setFormValue(setForm, { image_url });
       toast.success("Image uploaded");
+    },
+    onError: (error: Error) => {
+      const message = error.message.toLowerCase().includes("bucket")
+        ? "Product image storage is not ready. Run the latest Supabase storage migration."
+        : error.message;
+      toast.error(message);
+    },
+  });
+
+  const uploadColorImages = useMutation({
+    mutationFn: async (uploads: ColorImageUpload[]) => {
+      const baseName = slugify(form.slug || form.name || "product") || "product";
+      const uploadedEntries: [string, string][] = [];
+
+      for (const upload of uploads) {
+        const colorSlug = slugify(upload.color) || "color";
+        const imageUrl = await uploadProductImage(upload.file, `${baseName}-${colorSlug}`);
+        uploadedEntries.push([upload.color, imageUrl]);
+      }
+
+      return uploadedEntries;
+    },
+    onSuccess: (entries) => {
+      const currentImages = parseColorImages(form.color_images);
+      const nextImages = { ...currentImages, ...Object.fromEntries(entries) };
+      setFormValue(setForm, {
+        color_images: formatColorImages(nextImages),
+        image_url: form.image_url || entries[0]?.[1] || "",
+      });
+      toast.success(entries.length === 1 ? "Color image uploaded" : "Color images uploaded");
     },
     onError: (error: Error) => {
       const message = error.message.toLowerCase().includes("bucket")
@@ -291,6 +305,35 @@ function ProductsAdmin() {
             multiline
             required={false}
           />
+          <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-3 text-xs tracking-[0.18em] uppercase hover:bg-secondary">
+            <Upload className="size-4" />
+            {uploadColorImages.isPending ? "Uploading color images..." : "Upload color images"}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              disabled={uploadColorImages.isPending}
+              onChange={(event) => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                event.currentTarget.value = "";
+                if (files.length === 0) return;
+
+                const colors = splitList(form.colors);
+                const uploads: ColorImageUpload[] = [];
+
+                for (const [index, file] of files.entries()) {
+                  const suggestedColor = colors[index] ?? colors[0] ?? "";
+                  const color = window.prompt(`Colour for ${file.name}`, suggestedColor);
+                  if (color?.trim()) {
+                    uploads.push({ color: color.trim(), file });
+                  }
+                }
+
+                if (uploads.length > 0) uploadColorImages.mutate(uploads);
+              }}
+            />
+          </label>
           <AdminField
             label="Sizes"
             value={form.sizes}
@@ -620,6 +663,31 @@ function AdminField({
 
 function setFormValue(setForm: Dispatch<SetStateAction<ProductForm>>, patch: Partial<ProductForm>) {
   setForm((current) => ({ ...current, ...patch }));
+}
+
+async function uploadProductImage(file: File, namePrefix: string) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Upload an image file.");
+  }
+
+  if (file.size > MAX_PRODUCT_IMAGE_SIZE) {
+    throw new Error("Image must be 5 MB or smaller.");
+  }
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `products/${namePrefix}-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false,
+  });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+  if (!data.publicUrl) throw new Error("Could not create image URL.");
+  return data.publicUrl;
 }
 
 function productToForm(product: Product): ProductForm {
