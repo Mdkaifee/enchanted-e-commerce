@@ -45,23 +45,49 @@ type SupabaseAuthUserResponse = {
   id?: string;
 };
 
+type SupabaseAccessTokenClaims = {
+  iss?: string;
+};
+
 function serverEnv(name: string) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing server environment variable: ${name}`);
   return value;
 }
 
-function serverSupabaseAuthEnv() {
-  const url =
-    process.env["APP_PUBLIC_SUPABASE_URL"] ??
-    process.env["APP_SUPABASE_URL"] ??
-    DEFAULT_SUPABASE_URL;
-  const publishableKey =
-    process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
-    process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
-    DEFAULT_SUPABASE_PUBLISHABLE_KEY;
+function decodeBase64Url(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  if (typeof atob === "function") return atob(padded);
+  return Buffer.from(padded, "base64").toString("utf8");
+}
 
-  return { url, publishableKey };
+function supabaseUrlFromToken(accessToken: string) {
+  try {
+    const [, payload] = accessToken.split(".");
+    const claims = JSON.parse(decodeBase64Url(payload ?? "")) as SupabaseAccessTokenClaims;
+    const issuer = claims.iss;
+    if (issuer?.startsWith("https://")) {
+      return issuer.replace(/\/auth\/v1\/?$/, "");
+    }
+  } catch {
+    /* token shape is validated separately */
+  }
+  return undefined;
+}
+
+function serverSupabaseAuthEnv(accessToken: string) {
+  const tokenUrl = supabaseUrlFromToken(accessToken);
+  const envUrl = process.env["APP_PUBLIC_SUPABASE_URL"] ?? process.env["APP_SUPABASE_URL"];
+  const url = tokenUrl ?? envUrl ?? DEFAULT_SUPABASE_URL;
+  const publishableKey =
+    url === DEFAULT_SUPABASE_URL
+      ? DEFAULT_SUPABASE_PUBLISHABLE_KEY
+      : (process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+        process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
+        DEFAULT_SUPABASE_PUBLISHABLE_KEY);
+
+  return { envUrl, tokenUrl, url, publishableKey };
 }
 
 function encodeBasicAuth(user: string, password: string) {
@@ -103,7 +129,7 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 async function getAuthenticatedUserId(accessToken: string) {
-  const { url, publishableKey } = serverSupabaseAuthEnv();
+  const { envUrl, tokenUrl, url, publishableKey } = serverSupabaseAuthEnv(accessToken);
 
   const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, {
     method: "GET",
@@ -118,6 +144,8 @@ async function getAuthenticatedUserId(accessToken: string) {
     console.error("[Checkout auth] Supabase rejected checkout token", {
       status: response.status,
       statusText: response.statusText,
+      envUrl,
+      tokenUrl,
       supabaseUrl: url,
       body: body.slice(0, 300),
     });
@@ -127,6 +155,8 @@ async function getAuthenticatedUserId(accessToken: string) {
   const user = (await response.json()) as SupabaseAuthUserResponse;
   if (!user.id) {
     console.error("[Checkout auth] Supabase rejected checkout token", {
+      envUrl,
+      tokenUrl,
       supabaseUrl: url,
       body: "User response did not include an id.",
     });
