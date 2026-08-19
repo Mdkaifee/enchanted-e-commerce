@@ -33,14 +33,19 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
-    const SUPABASE_URL = process.env["APP_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
+    const SUPABASE_URL =
+      process.env["APP_SUPABASE_URL"] ??
+      process.env["APP_PUBLIC_SUPABASE_URL"] ??
+      process.env["SUPABASE_URL"];
     const SUPABASE_PUBLISHABLE_KEY =
-      process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ?? process.env["SUPABASE_PUBLISHABLE_KEY"];
+      process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
+      process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+      process.env["SUPABASE_PUBLISHABLE_KEY"];
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
-        ...(!SUPABASE_URL ? ["APP_SUPABASE_URL"] : []),
-        ...(!SUPABASE_PUBLISHABLE_KEY ? ["APP_SUPABASE_PUBLISHABLE_KEY"] : []),
+        ...(!SUPABASE_URL ? ["APP_PUBLIC_SUPABASE_URL"] : []),
+        ...(!SUPABASE_PUBLISHABLE_KEY ? ["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] : []),
       ];
       const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
       console.error(`[Supabase] ${message}`);
