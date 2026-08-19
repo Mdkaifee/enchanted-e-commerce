@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const DEFAULT_SUPABASE_URL = "https://qrzacztkouanbpvogfzs.supabase.co";
+const DEFAULT_SUPABASE_URL = "https://qrzaczktouanbpvogfzs.supabase.co";
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WBsqgeOyqbRxLsF8aBQwhA_05Yoxnzz";
 
 function isNewSupabaseApiKey(value: string): boolean {
