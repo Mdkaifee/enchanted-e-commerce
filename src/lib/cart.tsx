@@ -29,7 +29,7 @@ type CartContextValue = {
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
-const STORAGE_KEY = "atelier-sand-cart";
+const STORAGE_KEY = "md-attire-cart";
 
 const keyOf = (l: { slug: string; size: string; color: string }) =>
   `${l.slug}|${l.size}|${l.color}`;
@@ -71,11 +71,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const setQty = useCallback((slug: string, size: string, color: string, qty: number) => {
     setLines((prev) =>
       prev.flatMap((l) =>
-        keyOf(l) === keyOf({ slug, size, color })
-          ? qty <= 0
-            ? []
-            : [{ ...l, qty }]
-          : [l],
+        keyOf(l) === keyOf({ slug, size, color }) ? (qty <= 0 ? [] : [{ ...l, qty }]) : [l],
       ),
     );
   }, []);

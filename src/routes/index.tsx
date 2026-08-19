@@ -5,21 +5,22 @@ import { ArrowRight } from "lucide-react";
 
 import heroImage from "@/assets/hero.jpg";
 import storyImage from "@/assets/story.jpg";
-import { CATEGORIES, CATEGORY_IMAGES, productsQuery } from "@/lib/catalog";
+import { CATEGORIES, CATEGORY_IMAGES, formatPrice, productsQuery } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { Marquee } from "@/components/marquee";
 import { useParallax, useScrollReveal } from "@/hooks/use-reveal";
+import { getShippingConfig } from "@/lib/shipping";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Atelier Sand — Slow-made clothing in natural fibres" },
+      { title: "MD Attire — Slow-made clothing in natural fibres" },
       {
         name: "description",
         content:
           "Linen shirting, merino knitwear, tailored trousers and silk dresses, cut in small runs and finished by hand.",
       },
-      { property: "og:title", content: "Atelier Sand — Slow-made clothing" },
+      { property: "og:title", content: "MD Attire — Slow-made clothing" },
       {
         property: "og:description",
         content:
@@ -38,6 +39,7 @@ function Home() {
 
   const featured = products.filter((p) => p.featured);
   const [lead, ...rest] = featured;
+  const shippingConfig = getShippingConfig();
 
   return (
     <div>
@@ -63,13 +65,10 @@ function Home() {
               className="rise-in mt-8 max-w-md text-base leading-relaxed text-muted-foreground"
               style={{ animationDelay: "280ms" }}
             >
-              Linen, merino and silk cut in small runs. Nothing shouted, nothing
-              disposable — just quiet clothing you'll keep reaching for.
+              Linen, merino and silk cut in small runs. Nothing shouted, nothing disposable — just
+              quiet clothing you'll keep reaching for.
             </p>
-            <div
-              className="rise-in mt-10 flex flex-wrap gap-4"
-              style={{ animationDelay: "380ms" }}
-            >
+            <div className="rise-in mt-10 flex flex-wrap gap-4" style={{ animationDelay: "380ms" }}>
               <Link
                 to="/shop"
                 className="press group inline-flex items-center gap-3 bg-foreground px-8 py-4 text-[11px] tracking-[0.24em] text-background uppercase"
@@ -109,7 +108,7 @@ function Home() {
         items={[
           "Small-run production",
           "Natural fibres only",
-          "Free shipping over $200",
+          `Free shipping from ${formatPrice(shippingConfig.freeShippingThreshold)}`,
           "Repairs for life",
         ]}
       />
@@ -118,9 +117,7 @@ function Home() {
       <section className="mx-auto max-w-7xl px-6 py-24">
         <div data-reveal className="reveal flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
-              Featured
-            </p>
+            <p className="text-[11px] tracking-[0.3em] text-muted-foreground uppercase">Featured</p>
             <h2 className="mt-3 font-display text-4xl font-light sm:text-5xl">
               The season in six pieces
             </h2>
@@ -151,9 +148,7 @@ function Home() {
                   Piece of the season
                 </p>
                 <h3 className="mt-2 font-display text-3xl text-background">{lead.name}</h3>
-                <p className="mt-2 max-w-md text-sm text-background/80">
-                  {lead.description}
-                </p>
+                <p className="mt-2 max-w-md text-sm text-background/80">{lead.description}</p>
               </div>
             </Link>
 
@@ -213,16 +208,13 @@ function Home() {
           />
         </div>
         <div data-reveal className="reveal">
-          <p className="text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
-            The atelier
-          </p>
+          <p className="text-[11px] tracking-[0.3em] text-muted-foreground uppercase">The studio</p>
           <h2 className="mt-4 font-display text-4xl leading-tight font-light sm:text-5xl">
             Cut in small runs, finished by hand
           </h2>
           <p className="mt-6 text-base leading-relaxed text-muted-foreground">
-            Every garment starts as a bolt of undyed cloth chosen with the mill. We cut
-            forty to eighty pieces at a time, press each seam by hand, and stop when the
-            cloth runs out.
+            Every garment starts as a bolt of undyed cloth chosen with the mill. We cut forty to
+            eighty pieces at a time, press each seam by hand, and stop when the cloth runs out.
           </p>
           <div className="mt-10 grid grid-cols-3 gap-6 border-t border-border pt-8">
             {[

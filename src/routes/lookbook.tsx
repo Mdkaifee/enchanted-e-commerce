@@ -8,13 +8,13 @@ import { Marquee } from "@/components/marquee";
 export const Route = createFileRoute("/lookbook")({
   head: () => ({
     meta: [
-      { title: "Lookbook — Atelier Sand" },
+      { title: "Lookbook — MD Attire" },
       {
         name: "description",
         content:
-          "An editorial view of the Atelier Sand season: linen, merino and silk photographed in natural light.",
+          "An editorial view of the MD Attire season: linen, merino and silk photographed in natural light.",
       },
-      { property: "og:title", content: "Lookbook — Atelier Sand" },
+      { property: "og:title", content: "Lookbook — MD Attire" },
       {
         property: "og:description",
         content: "An editorial view of the season in natural light.",

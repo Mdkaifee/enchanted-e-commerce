@@ -1,21 +1,59 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { CreditCard, Minus, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/catalog";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { createCheckoutOrder, verifyRazorpayPayment } from "@/lib/payments";
+import { calculateShipping, getShippingConfig } from "@/lib/shipping";
+
+type RazorpayCheckoutResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckoutOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    email: string;
+  };
+  notes: Record<string, string>;
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpayCheckoutResponse) => void | Promise<void>;
+  modal: {
+    ondismiss: () => void;
+  };
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayCheckoutOptions) => {
+      open: () => void;
+    };
+  }
+}
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
     meta: [
-      { title: "Your bag — Atelier Sand" },
+      { title: "Your bag — MD Attire" },
       {
         name: "description",
-        content: "Review the pieces in your Atelier Sand bag and complete your order.",
+        content: "Review the pieces in your MD Attire bag and complete your order.",
       },
-      { property: "og:title", content: "Your bag — Atelier Sand" },
+      { property: "og:title", content: "Your bag — MD Attire" },
       { property: "og:description", content: "Review your selection and check out." },
     ],
   }),
@@ -24,7 +62,10 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { lines, subtotal, setQty, remove, clear } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const createCheckout = useServerFn(createCheckoutOrder);
+  const verifyPayment = useServerFn(verifyRazorpayPayment);
   const [placing, setPlacing] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -34,26 +75,110 @@ function CartPage() {
     postal_code: "",
   });
 
-  const shipping = subtotal > 200 || subtotal === 0 ? 0 : 18;
+  const shippingConfig = getShippingConfig();
+  const shipping = calculateShipping(subtotal, shippingConfig);
   const total = subtotal + shipping;
+
+  useEffect(() => {
+    const metadata = user?.user_metadata as { full_name?: string } | undefined;
+    setForm((current) => ({
+      ...current,
+      full_name: current.full_name || metadata?.full_name || "",
+      email: current.email || user?.email || "",
+    }));
+  }, [user?.email, user?.user_metadata]);
+
+  async function loadRazorpayCheckout() {
+    if (window.Razorpay) return true;
+    return new Promise<boolean>((resolve) => {
+      const existing = document.querySelector<HTMLScriptElement>(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+      );
+      if (existing) {
+        existing.addEventListener("load", () => resolve(true), { once: true });
+        existing.addEventListener("error", () => resolve(false), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  }
 
   async function placeOrder(e: React.FormEvent) {
     e.preventDefault();
     if (lines.length === 0) return;
-    setPlacing(true);
-    const { error } = await supabase.from("orders").insert({
-      ...form,
-      items: lines,
-      total,
-    });
-    setPlacing(false);
-    if (error) {
-      toast.error("We couldn't place your order. Please try again.");
+    if (!user) {
+      navigate({ to: "/login", search: { redirect: "/cart" } });
       return;
     }
-    clear();
-    toast.success("Order placed — a confirmation is on its way.");
-    navigate({ to: "/shop" });
+
+    setPlacing(true);
+    try {
+      const checkout = await createCheckout({
+        data: {
+          customer: form,
+          lines: lines.map(({ slug, size, color, qty }) => ({ slug, size, color, qty })),
+        },
+      });
+
+      const loaded = await loadRazorpayCheckout();
+      if (!loaded || !window.Razorpay) {
+        throw new Error("Razorpay checkout could not load. Check your connection and try again.");
+      }
+
+      const razorpay = new window.Razorpay({
+        key: checkout.keyId,
+        amount: checkout.amount,
+        currency: checkout.currency,
+        name: "MD Attire",
+        description: "Slow-made clothing order",
+        order_id: checkout.razorpayOrderId,
+        prefill: {
+          name: form.full_name,
+          email: form.email,
+        },
+        notes: {
+          order_id: checkout.orderId,
+        },
+        theme: {
+          color: "#8b7355",
+        },
+        handler: async (response) => {
+          try {
+            const paid = await verifyPayment({
+              data: {
+                orderId: checkout.orderId,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              },
+            });
+            clear();
+            toast.success("Payment verified. Your order is confirmed.");
+            navigate({ to: "/order/$id", params: { id: paid.orderId } });
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Payment verification failed.");
+          } finally {
+            setPlacing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPlacing(false);
+            toast.message("Payment window closed. Your order is still pending.");
+          },
+        },
+      });
+
+      razorpay.open();
+    } catch (error) {
+      setPlacing(false);
+      toast.error(error instanceof Error ? error.message : "Checkout could not start.");
+    }
   }
 
   if (lines.length === 0) {
@@ -157,6 +282,21 @@ function CartPage() {
             </div>
           </dl>
 
+          <div className="mt-6 grid gap-3 border-y border-border py-5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-primary" />
+              Payment is verified server-side before the order is marked paid.
+            </div>
+            <div className="flex items-center gap-2">
+              <CreditCard className="size-4 text-primary" />
+              Razorpay test mode is enabled for cards, UPI and wallets.
+            </div>
+            <div>
+              Orders below {formatPrice(shippingConfig.freeShippingThreshold)} include a{" "}
+              {formatPrice(shippingConfig.shippingFee)} shipping fee.
+            </div>
+          </div>
+
           <form onSubmit={placeOrder} className="mt-8 space-y-3">
             <Field
               label="Full name"
@@ -191,7 +331,7 @@ function CartPage() {
               disabled={placing}
               className="press w-full bg-foreground py-4 text-xs tracking-[0.24em] text-background uppercase disabled:opacity-60"
             >
-              {placing ? "Placing order…" : "Place order"}
+              {placing ? "Opening Razorpay..." : user ? "Pay with Razorpay" : "Sign in to checkout"}
             </button>
           </form>
         </div>

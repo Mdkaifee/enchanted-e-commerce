@@ -2,17 +2,21 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Heart } from "lucide-react";
 
 import { formatPrice, productImage, productsQuery } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
+import { useAuth } from "@/lib/auth";
+import { useWishlist } from "@/lib/wishlist";
+import { getShippingConfig } from "@/lib/shipping";
 
 export const Route = createFileRoute("/product/$slug")({
   head: ({ params }) => {
-    const title = `${params.slug.replace(/-/g, " ")} — Atelier Sand`;
+    const title = `${params.slug.replace(/-/g, " ")} — MD Attire`;
     const description =
-      "A slow-made piece from the Atelier Sand collection, cut in natural fibres and finished by hand.";
+      "A slow-made piece from the MD Attire collection, cut in natural fibres and finished by hand.";
     return {
       meta: [
         { title },
@@ -27,8 +31,12 @@ export const Route = createFileRoute("/product/$slug")({
 
 function ProductDetail() {
   const { slug } = Route.useParams();
+  const navigate = Route.useNavigate();
   const { data: products = [], isLoading } = useQuery(productsQuery);
   const { add } = useCart();
+  const { user } = useAuth();
+  const { isSaved, toggle } = useWishlist();
+  const shippingConfig = getShippingConfig();
 
   const product = useMemo(() => products.find((p) => p.slug === slug), [products, slug]);
   const related = useMemo(
@@ -169,6 +177,24 @@ function ProductDetail() {
             Add to bag
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              if (!user) {
+                navigate({
+                  to: "/login",
+                  search: { redirect: `/product/${product.slug}` },
+                });
+                return;
+              }
+              toggle(product.id);
+            }}
+            className="press mt-3 inline-flex w-full items-center justify-center gap-2 border border-border py-4 text-xs tracking-[0.24em] uppercase hover:bg-secondary"
+          >
+            <Heart className={`size-4 ${isSaved(product.id) ? "fill-primary text-primary" : ""}`} />
+            {isSaved(product.id) ? "Saved to wishlist" : "Save to wishlist"}
+          </button>
+
           <dl className="mt-10 divide-y divide-border border-y border-border text-sm">
             <div className="flex justify-between py-3">
               <dt className="text-muted-foreground">Category</dt>
@@ -176,7 +202,7 @@ function ProductDetail() {
             </div>
             <div className="flex justify-between py-3">
               <dt className="text-muted-foreground">Shipping</dt>
-              <dd>Complimentary over $200</dd>
+              <dd>Complimentary from {formatPrice(shippingConfig.freeShippingThreshold)}</dd>
             </div>
             <div className="flex justify-between py-3">
               <dt className="text-muted-foreground">Returns</dt>

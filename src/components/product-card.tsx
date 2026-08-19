@@ -1,7 +1,15 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Heart } from "lucide-react";
 import { formatPrice, productImage, type Product } from "@/lib/catalog";
+import { useAuth } from "@/lib/auth";
+import { useWishlist } from "@/lib/wishlist";
 
 export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+  const { user } = useAuth();
+  const { isSaved, toggle } = useWishlist();
+  const navigate = useNavigate();
+  const saved = isSaved(product.id);
+
   return (
     <Link
       to="/product/$slug"
@@ -24,6 +32,24 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             {product.badge}
           </span>
         )}
+        <button
+          type="button"
+          aria-label={saved ? "Remove from wishlist" : "Save to wishlist"}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!user) {
+              navigate({ to: "/login", search: { redirect: "/shop" } });
+              return;
+            }
+            toggle(product.id);
+          }}
+          className="press absolute top-4 right-4 grid size-9 place-items-center rounded-full bg-background/90 backdrop-blur"
+        >
+          <Heart
+            className={`size-4 transition-colors ${saved ? "fill-primary text-primary" : "text-foreground"}`}
+          />
+        </button>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-foreground/90 py-4 text-center text-[11px] tracking-[0.24em] text-background uppercase transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-y-0">
           View piece
         </div>

@@ -1,16 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu, ShoppingBag, X } from "lucide-react";
+import { Heart, Menu, ShoppingBag, User, X } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useAuth } from "@/lib/auth";
 
 const NAV = [
   { to: "/shop", label: "Shop" },
   { to: "/lookbook", label: "Lookbook" },
-  { to: "/about", label: "Atelier" },
+  { to: "/about", label: "Story" },
+  { to: "/shipping", label: "Shipping" },
 ];
 
 export function SiteHeader() {
   const { count } = useCart();
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -30,11 +33,8 @@ export function SiteHeader() {
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6">
-        <Link
-          to="/"
-          className="font-display text-xl font-medium tracking-[0.28em] uppercase press"
-        >
-          Atelier
+        <Link to="/" className="font-display text-xl font-medium tracking-[0.28em] uppercase press">
+          MD Attire
         </Link>
 
         <nav className="hidden items-center gap-10 md:flex">
@@ -51,6 +51,20 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <Link
+            to="/wishlist"
+            aria-label="Wishlist"
+            className="press hidden size-9 place-items-center rounded-full border border-border hover:bg-secondary sm:grid"
+          >
+            <Heart className="size-4" />
+          </Link>
+          <Link
+            to={user ? "/account" : "/login"}
+            aria-label={user ? "Account" : "Sign in"}
+            className="press hidden size-9 place-items-center rounded-full border border-border hover:bg-secondary sm:grid"
+          >
+            <User className="size-4" />
+          </Link>
           <Link
             to="/cart"
             className="press relative inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs tracking-[0.18em] uppercase hover:bg-secondary"
@@ -89,6 +103,20 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          <Link
+            to="/wishlist"
+            onClick={() => setOpen(false)}
+            className="rounded-sm px-3 py-3 text-sm tracking-wide transition-colors hover:bg-secondary"
+          >
+            Wishlist
+          </Link>
+          <Link
+            to={user ? "/account" : "/login"}
+            onClick={() => setOpen(false)}
+            className="rounded-sm px-3 py-3 text-sm tracking-wide transition-colors hover:bg-secondary"
+          >
+            {user ? "Account" : "Sign in"}
+          </Link>
         </div>
       )}
     </header>

@@ -14,13 +14,13 @@ export const Route = createFileRoute("/shop")({
   }),
   head: () => ({
     meta: [
-      { title: "Shop all pieces — Atelier Sand" },
+      { title: "Shop all pieces — MD Attire" },
       {
         name: "description",
         content:
-          "Browse the full Atelier Sand collection: linen shirting, merino knitwear, tailored trousers, silk dresses, outerwear and accessories.",
+          "Browse the full MD Attire collection: linen shirting, merino knitwear, tailored trousers, silk dresses, outerwear and accessories.",
       },
-      { property: "og:title", content: "Shop all pieces — Atelier Sand" },
+      { property: "og:title", content: "Shop all pieces — MD Attire" },
       {
         property: "og:description",
         content: "The full collection of slow-made clothing in natural fibres.",
@@ -60,11 +60,7 @@ function Shop() {
 
       <div className="mt-12 flex flex-wrap items-center justify-between gap-6 border-y border-border py-4">
         <div className="flex flex-wrap gap-2">
-          <FilterChip
-            active={!category}
-            onClick={() => navigate({ search: {} })}
-            label="All"
-          />
+          <FilterChip active={!category} onClick={() => navigate({ search: {} })} label="All" />
           {CATEGORIES.map((c) => (
             <FilterChip
               key={c}

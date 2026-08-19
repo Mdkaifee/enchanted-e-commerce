@@ -38,7 +38,7 @@ export function productImage(product: Pick<Product, "image_url" | "category">) {
 }
 
 export function formatPrice(value: number) {
-  return `$${value.toFixed(0)}`;
+  return `₹${value.toFixed(0)}`;
 }
 
 async function fetchProducts(): Promise<Product[]> {

@@ -22,13 +22,13 @@ const VALUES = [
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "The atelier — Atelier Sand" },
+      { title: "Our story — MD Attire" },
       {
         name: "description",
         content:
-          "Atelier Sand is a small studio making slow, repairable clothing in natural fibres, cut in runs of fifty or fewer.",
+          "MD Attire is a small studio making slow, repairable clothing in natural fibres, cut in runs of fifty or fewer.",
       },
-      { property: "og:title", content: "The atelier — Atelier Sand" },
+      { property: "og:title", content: "Our story — MD Attire" },
       {
         property: "og:description",
         content: "A small studio making slow, repairable clothing in natural fibres.",
@@ -45,7 +45,7 @@ function About() {
     <div className="pb-24">
       <header className="mx-auto max-w-7xl px-6 pt-16">
         <p className="rise-in text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
-          The atelier
+          The studio
         </p>
         <h1 className="rise-in mt-4 max-w-4xl font-display text-5xl leading-[1.05] font-light sm:text-7xl">
           Clothes that are made once, and kept
@@ -56,15 +56,15 @@ function About() {
         <div data-reveal className="reveal-mask overflow-hidden bg-secondary">
           <img
             src={story}
-            alt="Inside the Atelier Sand studio"
+            alt="Inside the MD Attire studio"
             loading="lazy"
             className="aspect-[4/5] w-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
           />
         </div>
         <div data-reveal className="reveal space-y-5 text-sm leading-relaxed text-muted-foreground">
           <p>
-            Atelier Sand began in a two-room studio with a single roll of Belgian linen and a
-            stubborn belief that a wardrobe should get better with age, not worse.
+            MD Attire began in a two-room studio with a single roll of Belgian linen and a stubborn
+            belief that a wardrobe should get better with age, not worse.
           </p>
           <p>
             We work with three mills we've visited in person, dye in small lots, and finish every
@@ -78,7 +78,9 @@ function About() {
       </section>
 
       <div className="mt-24">
-        <Marquee items={["Since 2019", "Cut by hand", "Fifty pieces or fewer", "Repair, not replace"]} />
+        <Marquee
+          items={["Since 2019", "Cut by hand", "Fifty pieces or fewer", "Repair, not replace"]}
+        />
       </div>
 
       <section className="mx-auto mt-24 max-w-7xl px-6">
