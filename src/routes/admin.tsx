@@ -131,7 +131,6 @@ function ProductsAdmin() {
     [...products, { category: form.category }],
     managedCategories.map((category) => category.name),
   );
-  const imagePreview = form.image_url.trim();
   const productColors = splitList(form.colors);
   const colorImages = parseColorImages(form.color_images);
 
@@ -166,23 +165,6 @@ function ProductsAdmin() {
     },
   });
 
-  const uploadImage = useMutation({
-    mutationFn: async (file: File) => {
-      const baseName = slugify(form.slug || form.name || "product") || "product";
-      return uploadProductImage(file, `${baseName}-main`);
-    },
-    onSuccess: (image_url) => {
-      setFormValue(setForm, { image_url });
-      toast.success("Image uploaded");
-    },
-    onError: (error: Error) => {
-      const message = error.message.toLowerCase().includes("bucket")
-        ? "Product image storage is not ready. Run the latest Supabase storage migration."
-        : error.message;
-      toast.error(message);
-    },
-  });
-
   const uploadColorImages = useMutation({
     mutationFn: async (uploads: ColorImageUpload[]) => {
       const baseName = slugify(form.slug || form.name || "product") || "product";
@@ -199,9 +181,13 @@ function ProductsAdmin() {
     onSuccess: (entries) => {
       const currentImages = parseColorImages(form.color_images);
       const nextImages = { ...currentImages, ...Object.fromEntries(entries) };
+      const firstColorImage =
+        productColors.map((color) => nextImages[color]?.trim()).find(Boolean) ??
+        entries[0]?.[1] ??
+        "";
       setFormValue(setForm, {
         color_images: formatColorImages(nextImages),
-        image_url: form.image_url || entries[0]?.[1] || "",
+        image_url: firstColorImage,
       });
       toast.success(entries.length === 1 ? "Color image uploaded" : "Color images uploaded");
     },
@@ -227,7 +213,7 @@ function ProductsAdmin() {
         colors,
         color_images: colorImagesByColor,
         sizes: splitList(form.sizes),
-        image_url: form.image_url.trim() || firstColorImage,
+        image_url: firstColorImage,
         badge: form.badge.trim() || null,
         featured: form.featured,
       };
@@ -496,51 +482,6 @@ function ProductsAdmin() {
             onChange={(sizes) => setFormValue(setForm, { sizes })}
             placeholder="XS, S, M, L"
           />
-          <div className="grid gap-2">
-            <AdminField
-              label="Image URL"
-              value={form.image_url}
-              onChange={(image_url) => setFormValue(setForm, { image_url })}
-            />
-            <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-3 text-xs tracking-[0.18em] uppercase hover:bg-secondary">
-              <Upload className="size-4" />
-              {uploadImage.isPending ? "Uploading..." : "Upload product image"}
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={uploadImage.isPending}
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  event.currentTarget.value = "";
-                  if (file) uploadImage.mutate(file);
-                }}
-              />
-            </label>
-          </div>
-          <div>
-            <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
-              Current image
-            </span>
-            <div className="mt-2 grid grid-cols-[88px_1fr] items-center gap-3 border border-border p-2">
-              {imagePreview ? (
-                <img
-                  src={imagePreview}
-                  alt=""
-                  className="aspect-square w-full bg-secondary object-cover"
-                />
-              ) : (
-                <div className="grid aspect-square w-full place-items-center bg-secondary text-center text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-                  No image
-                </div>
-              )}
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {form.image_url.trim()
-                  ? "Using the saved product image URL."
-                  : "No product image is saved yet. Upload an image or paste an image URL."}
-              </p>
-            </div>
-          </div>
           <AdminField
             label="Badge"
             value={form.badge}

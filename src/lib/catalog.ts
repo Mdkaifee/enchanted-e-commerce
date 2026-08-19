@@ -62,12 +62,12 @@ export function productImage(
     return product.color_images[color].trim();
   }
 
-  const imageUrl = product.image_url.trim();
   const firstColorImage = product.color_images
     ? Object.values(product.color_images).find((value) => value.trim())
     : undefined;
+  const imageUrl = product.image_url.trim();
 
-  return imageUrl || firstColorImage || CATEGORY_IMAGES[product.category] || shirts;
+  return firstColorImage || imageUrl || CATEGORY_IMAGES[product.category] || shirts;
 }
 
 export function productCategories(
