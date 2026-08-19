@@ -7,6 +7,14 @@ function wishlistQueryKey(userId: string | undefined) {
   return ["wishlist", userId];
 }
 
+function isMissingWishlistTable(error: { code?: string; message?: string }) {
+  return (
+    error.code === "42P01" ||
+    error.message?.includes("public.wishlists") === true ||
+    error.message?.includes("schema cache") === true
+  );
+}
+
 export function useWishlist() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -19,6 +27,7 @@ export function useWishlist() {
         .from("wishlists")
         .select("product_id")
         .eq("user_id", userId!);
+      if (error && isMissingWishlistTable(error)) return new Set<string>();
       if (error) throw error;
       return new Set((data ?? []).map((row) => row.product_id));
     },
@@ -35,12 +44,18 @@ export function useWishlist() {
           .delete()
           .eq("user_id", userId)
           .eq("product_id", productId);
+        if (error && isMissingWishlistTable(error)) {
+          throw new Error("Wishlist is not ready yet. Apply the latest Supabase migrations.");
+        }
         if (error) throw error;
         return { added: false };
       }
       const { error } = await supabase
         .from("wishlists")
         .insert({ user_id: userId, product_id: productId });
+      if (error && isMissingWishlistTable(error)) {
+        throw new Error("Wishlist is not ready yet. Apply the latest Supabase migrations.");
+      }
       if (error) throw error;
       return { added: true };
     },

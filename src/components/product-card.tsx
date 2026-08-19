@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
-import { formatPrice, productImage, type Product } from "@/lib/catalog";
+import { CATEGORY_IMAGES, formatPrice, productImage, type Product } from "@/lib/catalog";
 import { useAuth } from "@/lib/auth";
 import { useWishlist } from "@/lib/wishlist";
 
@@ -9,6 +9,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
   const { isSaved, toggle } = useWishlist();
   const navigate = useNavigate();
   const saved = isSaved(product.id);
+  const fallbackImage = CATEGORY_IMAGES[product.category] ?? productImage(product);
 
   return (
     <Link
@@ -25,6 +26,11 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           loading="lazy"
           width={900}
           height={1200}
+          onError={(event) => {
+            if (event.currentTarget.src !== fallbackImage) {
+              event.currentTarget.src = fallbackImage;
+            }
+          }}
           className="size-full object-cover transition-transform duration-[1.1s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.07]"
         />
         {product.badge && (

@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Heart } from "lucide-react";
+import { Heart, Minus, Plus } from "lucide-react";
 
-import { formatPrice, productImage, productsQuery } from "@/lib/catalog";
+import { CATEGORY_IMAGES, formatPrice, productImage, productsQuery } from "@/lib/catalog";
 import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/product-card";
 import { useScrollReveal } from "@/hooks/use-reveal";
@@ -33,7 +33,7 @@ function ProductDetail() {
   const { slug } = Route.useParams();
   const navigate = Route.useNavigate();
   const { data: products = [], isLoading } = useQuery(productsQuery);
-  const { add } = useCart();
+  const { add, lines, setQty } = useCart();
   const { user } = useAuth();
   const { isSaved, toggle } = useWishlist();
   const shippingConfig = getShippingConfig();
@@ -46,11 +46,22 @@ function ProductDetail() {
 
   const [size, setSize] = useState<string>("");
   const [color, setColor] = useState<string>("");
+  const [displayImage, setDisplayImage] = useState<string>("");
+  const selectedLine = useMemo(
+    () =>
+      product
+        ? lines.find(
+            (line) => line.slug === product.slug && line.size === size && line.color === color,
+          )
+        : undefined,
+    [lines, product, size, color],
+  );
 
   useEffect(() => {
     if (product) {
       setSize(product.sizes[0] ?? "One size");
       setColor(product.colors[0] ?? "Natural");
+      setDisplayImage(productImage(product));
     }
   }, [product]);
 
@@ -86,6 +97,8 @@ function ProductDetail() {
     );
   }
 
+  const fallbackImage = CATEGORY_IMAGES[product.category] ?? productImage(product);
+
   return (
     <div className="mx-auto max-w-7xl px-6 pt-10 pb-24">
       <nav className="rise-in text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
@@ -96,15 +109,22 @@ function ProductDetail() {
         <span className="text-foreground">{product.category}</span>
       </nav>
 
-      <div className="mt-8 grid gap-14 lg:grid-cols-2">
+      <div className="mt-8 grid gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)]">
         <div data-reveal className="reveal-mask overflow-hidden bg-secondary">
-          <img
-            src={productImage(product)}
-            alt={product.name}
-            width={1200}
-            height={1600}
-            className="aspect-[3/4] w-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
-          />
+          <div className="relative aspect-[4/5] min-h-[420px] overflow-hidden sm:aspect-[3/4] lg:min-h-[620px]">
+            <img
+              src={displayImage || productImage(product)}
+              alt={product.name}
+              width={1200}
+              height={1600}
+              onError={() => setDisplayImage(fallbackImage)}
+              className="size-full object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-105"
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-background/75 to-transparent px-5 pt-5 pb-16 text-[10px] tracking-[0.22em] text-foreground uppercase">
+              <span>{product.category}</span>
+              <span>MD Attire</span>
+            </div>
+          </div>
         </div>
 
         <div className="rise-in lg:pt-6">
@@ -159,23 +179,52 @@ function ProductDetail() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              add({
-                slug: product.slug,
-                name: product.name,
-                price: product.price,
-                size: size || "One size",
-                color: color || "Natural",
-                image: productImage(product),
-              });
-              toast.success(`${product.name} added to your bag`);
-            }}
-            className="press mt-10 w-full bg-foreground py-4 text-xs tracking-[0.24em] text-background uppercase transition-opacity hover:opacity-90"
-          >
-            Add to bag
-          </button>
+          {selectedLine ? (
+            <div className="mt-10 flex h-14 items-center border border-foreground bg-foreground text-background">
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                onClick={() =>
+                  setQty(product.slug, size || "One size", color || "Natural", selectedLine.qty - 1)
+                }
+                className="press grid h-full w-16 place-items-center hover:bg-background/10"
+              >
+                <Minus className="size-4" />
+              </button>
+              <div className="flex flex-1 items-center justify-center gap-3 text-xs tracking-[0.22em] uppercase">
+                <span>{selectedLine.qty}</span>
+                <span>in bag</span>
+              </div>
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                onClick={() =>
+                  setQty(product.slug, size || "One size", color || "Natural", selectedLine.qty + 1)
+                }
+                className="press grid h-full w-16 place-items-center hover:bg-background/10"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                add({
+                  slug: product.slug,
+                  name: product.name,
+                  price: product.price,
+                  size: size || "One size",
+                  color: color || "Natural",
+                  image: displayImage || productImage(product),
+                });
+                toast.success(`${product.name} added to your bag`);
+              }}
+              className="press mt-10 w-full bg-foreground py-4 text-xs tracking-[0.24em] text-background uppercase transition-opacity hover:opacity-90"
+            >
+              Add to bag
+            </button>
+          )}
 
           <button
             type="button"
