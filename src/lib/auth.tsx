@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Session, User } from "@supabase/supabase-js";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getFreshSupabaseSession } from "@/lib/supabase-session";
 
 type AuthContextValue = {
   user: User | null;
@@ -21,19 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.startAutoRefresh();
+
+    getFreshSupabaseSession().then((nextSession) => {
       if (!active) return;
-      let nextSession = data.session;
-
-      if (nextSession) {
-        const { data: userData, error } = await supabase.auth.getUser(nextSession.access_token);
-        if (!active) return;
-        if (error || !userData.user) {
-          await supabase.auth.signOut();
-          nextSession = null;
-        }
-      }
-
       setIsAdmin(nextSession?.user ? null : false);
       setSession(nextSession);
       setLoading(false);
@@ -47,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+      supabase.auth.stopAutoRefresh();
       subscription.subscription.unsubscribe();
     };
   }, []);

@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/catalog";
 import { useAuth } from "@/lib/auth";
 import { createCheckoutOrder, verifyRazorpayPayment } from "@/lib/payments";
 import { calculateShipping, getShippingConfig } from "@/lib/shipping";
+import { getFreshSupabaseSession } from "@/lib/supabase-session";
 
 type RazorpayCheckoutResponse = {
   razorpay_order_id: string;
@@ -118,6 +119,15 @@ function CartPage() {
 
     setPlacing(true);
     try {
+      const session = await getFreshSupabaseSession();
+      if (!session) {
+        setPlacing(false);
+        await signOut();
+        navigate({ to: "/login", search: { redirect: "/cart" } });
+        toast.error("Please sign in again to checkout.");
+        return;
+      }
+
       const checkout = await createCheckout({
         data: {
           customer: form,
