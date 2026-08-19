@@ -33,14 +33,12 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  const SUPABASE_URL =
+  const configuredUrl =
     import.meta.env["APP_PUBLIC_SUPABASE_URL"] ||
     import.meta.env["VITE_APP_SUPABASE_URL"] ||
     process.env["APP_PUBLIC_SUPABASE_URL"] ||
-    process.env["APP_SUPABASE_URL"] ||
-    DEFAULT_SUPABASE_URL ||
-    import.meta.env["VITE_SUPABASE_URL"] ||
-    process.env["SUPABASE_URL"];
+    process.env["APP_SUPABASE_URL"];
+  const SUPABASE_URL = DEFAULT_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
     import.meta.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ||
     import.meta.env["VITE_APP_SUPABASE_PUBLISHABLE_KEY"] ||
@@ -49,6 +47,13 @@ function createSupabaseClient() {
     DEFAULT_SUPABASE_PUBLISHABLE_KEY ||
     import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
     process.env["SUPABASE_PUBLISHABLE_KEY"];
+
+  if (configuredUrl && configuredUrl.replace(/\/$/, "") !== SUPABASE_URL) {
+    console.warn("[Supabase] Ignoring mismatched browser Supabase URL", {
+      configuredUrl,
+      expectedUrl: SUPABASE_URL,
+    });
+  }
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [

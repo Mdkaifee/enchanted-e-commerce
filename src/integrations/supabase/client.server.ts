@@ -35,13 +35,17 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL =
-    process.env["APP_PUBLIC_SUPABASE_URL"] ??
-    process.env["APP_SUPABASE_URL"] ??
-    DEFAULT_SUPABASE_URL ??
-    process.env["SUPABASE_URL"];
+  const configuredUrl = process.env["APP_SUPABASE_URL"] ?? process.env["APP_PUBLIC_SUPABASE_URL"];
+  const SUPABASE_URL = DEFAULT_SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY =
     process.env["APP_SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["SUPABASE_SERVICE_ROLE_KEY"];
+
+  if (configuredUrl && configuredUrl.replace(/\/$/, "") !== SUPABASE_URL) {
+    console.warn("[Supabase] Ignoring mismatched server Supabase URL", {
+      configuredUrl,
+      expectedUrl: SUPABASE_URL,
+    });
+  }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [

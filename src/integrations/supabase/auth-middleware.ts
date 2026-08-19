@@ -36,11 +36,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
-    const SUPABASE_URL =
-      process.env["APP_PUBLIC_SUPABASE_URL"] ??
-      process.env["APP_SUPABASE_URL"] ??
-      DEFAULT_SUPABASE_URL ??
-      process.env["SUPABASE_URL"];
+    const SUPABASE_URL = DEFAULT_SUPABASE_URL;
     const SUPABASE_PUBLISHABLE_KEY =
       process.env["APP_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
       process.env["APP_SUPABASE_PUBLISHABLE_KEY"] ??
