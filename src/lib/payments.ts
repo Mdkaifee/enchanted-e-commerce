@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import type { Database } from "@/integrations/supabase/types";
 import { calculateShipping, getShippingConfig } from "@/lib/shipping";
 
 const DEFAULT_SUPABASE_URL = "https://qrzaczktouanbpvogfzs.supabase.co";
@@ -41,6 +39,10 @@ type RazorpayOrderResponse = {
   amount: number;
   currency: string;
   status: string;
+};
+
+type SupabaseAuthUserResponse = {
+  id?: string;
 };
 
 function serverEnv(name: string) {
@@ -102,26 +104,36 @@ function constantTimeEqual(left: string, right: string) {
 
 async function getAuthenticatedUserId(accessToken: string) {
   const { url, publishableKey } = serverSupabaseAuthEnv();
-  const supabaseAuth = createClient<Database>(url, publishableKey, {
-    auth: {
-      storage: undefined,
-      persistSession: false,
-      autoRefreshToken: false,
+
+  const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, {
+    method: "GET",
+    headers: {
+      apikey: publishableKey,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 
-  const { data, error } = await supabaseAuth.auth.getUser(accessToken);
-
-  if (error || !data.user?.id) {
+  if (!response.ok) {
+    const body = await response.text();
     console.error("[Checkout auth] Supabase rejected checkout token", {
-      message: error?.message,
-      status: error?.status,
+      status: response.status,
+      statusText: response.statusText,
       supabaseUrl: url,
+      body: body.slice(0, 300),
     });
     throw new Error("Please sign in again to checkout.");
   }
 
-  return data.user.id;
+  const user = (await response.json()) as SupabaseAuthUserResponse;
+  if (!user.id) {
+    console.error("[Checkout auth] Supabase rejected checkout token", {
+      supabaseUrl: url,
+      body: "User response did not include an id.",
+    });
+    throw new Error("Please sign in again to checkout.");
+  }
+
+  return user.id;
 }
 
 export const createCheckoutOrder = createServerFn({ method: "POST" })
