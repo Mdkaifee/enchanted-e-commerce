@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart } from "lucide-react";
+import { ArrowUpRight, Heart } from "lucide-react";
 import { CATEGORY_IMAGES, formatPrice, productImage, type Product } from "@/lib/catalog";
 import { useAuth } from "@/lib/auth";
 import { useWishlist } from "@/lib/wishlist";
@@ -56,8 +56,14 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             className={`size-4 transition-colors ${saved ? "fill-primary text-primary" : "text-foreground"}`}
           />
         </button>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-foreground/90 py-4 text-center text-[11px] tracking-[0.24em] text-background uppercase transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-y-0">
-          View details
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-y-0 group-hover:opacity-100">
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-foreground/45 via-foreground/12 to-transparent" />
+          <div className="relative m-4 flex items-center justify-between border border-background/45 bg-background/88 px-4 py-3 text-foreground shadow-[0_18px_45px_rgba(44,37,31,0.18)] backdrop-blur-md">
+            <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
+              View details
+            </span>
+            <ArrowUpRight className="size-4 text-primary transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </div>
         </div>
       </div>
       <div className="mt-5 flex items-start justify-between gap-4">
