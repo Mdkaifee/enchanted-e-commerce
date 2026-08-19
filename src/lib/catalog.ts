@@ -34,7 +34,8 @@ export const CATEGORY_IMAGES: Record<string, string> = {
 export const CATEGORIES = Object.keys(CATEGORY_IMAGES);
 
 export function productImage(product: Pick<Product, "image_url" | "category">) {
-  return product.image_url || CATEGORY_IMAGES[product.category] || shirts;
+  const imageUrl = product.image_url.trim();
+  return imageUrl || CATEGORY_IMAGES[product.category] || shirts;
 }
 
 export function formatPrice(value: number) {

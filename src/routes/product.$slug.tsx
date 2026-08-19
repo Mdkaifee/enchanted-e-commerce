@@ -110,7 +110,7 @@ function ProductDetail() {
       </nav>
 
       <div className="mt-8 grid gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)]">
-        <div data-reveal className="reveal-mask overflow-hidden bg-secondary">
+        <div className="rise-in overflow-hidden bg-secondary">
           <div className="relative aspect-[4/5] min-h-[420px] overflow-hidden sm:aspect-[3/4] lg:min-h-[620px]">
             <img
               src={displayImage || productImage(product)}
