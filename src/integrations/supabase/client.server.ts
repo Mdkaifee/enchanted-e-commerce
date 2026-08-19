@@ -5,6 +5,8 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
+const DEFAULT_SUPABASE_URL = "https://qrzaczktouanbpvogfzs.supabase.co";
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
@@ -34,8 +36,9 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL =
-    process.env["APP_SUPABASE_URL"] ??
     process.env["APP_PUBLIC_SUPABASE_URL"] ??
+    process.env["APP_SUPABASE_URL"] ??
+    DEFAULT_SUPABASE_URL ??
     process.env["SUPABASE_URL"];
   const SUPABASE_SERVICE_ROLE_KEY =
     process.env["APP_SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["SUPABASE_SERVICE_ROLE_KEY"];
