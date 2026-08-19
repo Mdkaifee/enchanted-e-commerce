@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, Package, Plus, Save, Trash2 } from "lucide-react";
+import { Edit3, Package, Plus, Save, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { toast } from "sonner";
@@ -49,6 +49,9 @@ const paymentLabels: Record<string, string> = {
   paid: "Paid",
   failed: "Payment failed",
 };
+
+const PRODUCT_IMAGE_BUCKET = "product-images";
+const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
 
 const emptyProduct: ProductForm = {
   slug: "",
@@ -120,6 +123,44 @@ function ProductsAdmin() {
   const [form, setForm] = useState<ProductForm>(emptyProduct);
   const categories = productCategories(products);
   const imagePreview = form.image_url.trim() || categoryImage(form.category, products);
+
+  const uploadImage = useMutation({
+    mutationFn: async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Upload an image file.");
+      }
+
+      if (file.size > MAX_PRODUCT_IMAGE_SIZE) {
+        throw new Error("Image must be 5 MB or smaller.");
+      }
+
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const baseName = slugify(form.slug || form.name || "product") || "product";
+      const path = `products/${baseName}-${Date.now()}.${extension}`;
+
+      const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
+        cacheControl: "31536000",
+        contentType: file.type,
+        upsert: false,
+      });
+
+      if (error) throw error;
+
+      const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+      if (!data.publicUrl) throw new Error("Could not create image URL.");
+      return data.publicUrl;
+    },
+    onSuccess: (image_url) => {
+      setFormValue(setForm, { image_url });
+      toast.success("Image uploaded");
+    },
+    onError: (error: Error) => {
+      const message = error.message.toLowerCase().includes("bucket")
+        ? "Product image storage is not ready. Run the latest Supabase storage migration."
+        : error.message;
+      toast.error(message);
+    },
+  });
 
   const saveProduct = useMutation({
     mutationFn: async () => {
@@ -256,11 +297,28 @@ function ProductsAdmin() {
             onChange={(sizes) => setFormValue(setForm, { sizes })}
             placeholder="XS, S, M, L"
           />
-          <AdminField
-            label="Image URL"
-            value={form.image_url}
-            onChange={(image_url) => setFormValue(setForm, { image_url })}
-          />
+          <div className="grid gap-2">
+            <AdminField
+              label="Image URL"
+              value={form.image_url}
+              onChange={(image_url) => setFormValue(setForm, { image_url })}
+            />
+            <label className="press inline-flex cursor-pointer items-center justify-center gap-2 border border-border px-4 py-3 text-xs tracking-[0.18em] uppercase hover:bg-secondary">
+              <Upload className="size-4" />
+              {uploadImage.isPending ? "Uploading..." : "Upload product image"}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={uploadImage.isPending}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) uploadImage.mutate(file);
+                }}
+              />
+            </label>
+          </div>
           <div>
             <span className="text-[10px] tracking-[0.22em] text-muted-foreground uppercase">
               Current image
