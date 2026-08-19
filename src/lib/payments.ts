@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { calculateShipping, getShippingConfig } from "@/lib/shipping";
+
+const accessTokenSchema = z
+  .string()
+  .min(1)
+  .refine((token) => token.split(".").length === 3, "Please sign in again to checkout.");
 
 const checkoutLineSchema = z.object({
   slug: z.string().min(1),
@@ -20,6 +24,7 @@ const customerSchema = z.object({
 });
 
 const verifyPaymentSchema = z.object({
+  accessToken: accessTokenSchema,
   orderId: z.string().uuid(),
   razorpayOrderId: z.string().min(1),
   razorpayPaymentId: z.string().min(1),
@@ -77,19 +82,30 @@ function constantTimeEqual(left: string, right: string) {
   return result === 0;
 }
 
+async function getAuthenticatedUserId(accessToken: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+
+  if (error || !data.user?.id) {
+    throw new Error("Please sign in again to checkout.");
+  }
+
+  return data.user.id;
+}
+
 export const createCheckoutOrder = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator(
     z.object({
+      accessToken: accessTokenSchema,
       lines: z.array(checkoutLineSchema).min(1),
       customer: customerSchema,
     }),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const keyId = serverEnv("RAZORPAY_KEY_ID");
     const keySecret = serverEnv("RAZORPAY_KEY_SECRET");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const userId = context.userId as string;
+    const userId = await getAuthenticatedUserId(data.accessToken);
     const slugs = Array.from(new Set(data.lines.map((line) => line.slug)));
 
     const { data: products, error: productsError } = await supabaseAdmin
@@ -184,12 +200,11 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
   });
 
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator(verifyPaymentSchema)
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const keySecret = serverEnv("RAZORPAY_KEY_SECRET");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const userId = context.userId as string;
+    const userId = await getAuthenticatedUserId(data.accessToken);
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")

@@ -130,6 +130,7 @@ function CartPage() {
 
       const checkout = await createCheckout({
         data: {
+          accessToken: session.access_token,
           customer: form,
           lines: lines.map(({ slug, size, color, qty }) => ({ slug, size, color, qty })),
         },
@@ -159,8 +160,17 @@ function CartPage() {
         },
         handler: async (response) => {
           try {
+            const paymentSession = await getFreshSupabaseSession();
+            if (!paymentSession) {
+              await signOut();
+              navigate({ to: "/login", search: { redirect: "/cart" } });
+              toast.error("Please sign in again to verify payment.");
+              return;
+            }
+
             const paid = await verifyPayment({
               data: {
+                accessToken: paymentSession.access_token,
                 orderId: checkout.orderId,
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
