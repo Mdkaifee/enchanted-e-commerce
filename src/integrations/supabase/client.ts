@@ -81,6 +81,11 @@ function createSupabaseClient() {
       storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+      // Email confirmation/reset links must never auto-sign the browser in —
+      // we send people to /login and require an explicit password entry.
+      // PKCE also keeps raw access/refresh tokens out of the URL entirely.
+      flowType: "pkce",
+      detectSessionInUrl: false,
     },
   });
 }

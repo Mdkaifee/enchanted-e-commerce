@@ -1,0 +1,67 @@
+<!--
+  Paste this into Supabase Dashboard → Authentication → Email Templates →
+  "Confirm signup" (replace the whole body). Suggested subject line:
+  "Confirm your email — MD Attire"
+
+  Email clients ignore <style> blocks unreliably and strip external
+  stylesheets/fonts, so everything below is a table layout with inline
+  styles and websafe font stacks — do not "clean this up" into modern CSS.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf8f5;padding:40px 16px;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border:1px solid #e7e0d4;">
+        <tr>
+          <td style="padding:40px 40px 24px 40px;text-align:center;">
+            <span style="font-family:Georgia,'Times New Roman',serif;font-size:20px;letter-spacing:6px;color:#2b2420;text-transform:uppercase;">MD Attire</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 40px;">
+            <div style="border-top:1px solid #e7e0d4;"></div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 8px 40px;text-align:center;">
+            <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:26px;color:#2b2420;">Confirm your email</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px 40px 0 40px;text-align:center;">
+            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#6b6058;">
+              Thanks for creating an account. Confirm your address below to finish signing up and start shopping.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 8px 40px;text-align:center;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background-color:#2b2420;color:#faf8f5;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;padding:16px 36px;">
+              Confirm email address
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 40px 0 40px;text-align:center;">
+            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:20px;color:#a39a8f;">
+              Button not working? Copy and paste this link into your browser:<br />
+              <a href="{{ .ConfirmationURL }}" style="color:#8b7355;word-break:break-all;">{{ .ConfirmationURL }}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 0 40px;">
+            <div style="border-top:1px solid #e7e0d4;"></div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 36px 40px;text-align:center;">
+            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:11px;line-height:18px;color:#a39a8f;">
+              You're receiving this email because this address was used to create an MD Attire account.<br />
+              If this wasn't you, you can safely ignore it.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

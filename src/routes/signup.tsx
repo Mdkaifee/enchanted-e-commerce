@@ -5,11 +5,12 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Field, PasswordField } from "@/components/form-field";
 
-type SignupSearch = { redirect?: string | undefined };
+type SignupSearch = { redirect?: string | undefined; email?: string | undefined };
 
 export const Route = createFileRoute("/signup")({
   validateSearch: (search: Record<string, unknown>): SignupSearch => ({
     redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
+    email: typeof search["email"] === "string" ? search["email"] : undefined,
   }),
   head: () => ({
     meta: [{ title: "Create an account — MD Attire" }],
@@ -18,38 +19,69 @@ export const Route = createFileRoute("/signup")({
 });
 
 function Signup() {
-  const { redirect } = Route.useSearch();
+  const { redirect, email: prefillEmail } = Route.useSearch();
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail ?? "");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const redirectPath = redirect || "/account";
-    const emailRedirectTo =
-      typeof window === "undefined"
-        ? "https://md-attire.lovable.app/account"
-        : new URL(redirectPath, window.location.origin).toString();
+    // The confirmation link always lands on /login, never signed in — the
+    // click just confirms the address server-side; signing in still needs an
+    // explicit password. Carry the original `redirect` along as a query
+    // param so login can still send them on to where they meant to go.
+    const confirmRedirectPath = redirect
+      ? `/login?redirect=${encodeURIComponent(redirect)}`
+      : "/login";
+    // Always resolve against the canonical site URL, never the browser's
+    // current origin — the confirmation email is often opened on a different
+    // device than the one used to sign up, so "wherever you signed up from"
+    // (e.g. localhost during local dev) is meaningless as a redirect target.
+    const siteUrl =
+      import.meta.env["VITE_SITE_URL"] ||
+      (typeof window === "undefined" ? "https://md-attire.lovable.app" : window.location.origin);
+    const emailRedirectTo = new URL(confirmRedirectPath, siteUrl).toString();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName }, emailRedirectTo },
     });
     setSubmitting(false);
+
+    const goToSignIn = () => navigate({ to: "/login", search: { redirect, email } });
+
     if (error) {
+      if (error.message.toLowerCase().includes("already registered")) {
+        toast.error("An account with this email already exists.", {
+          action: { label: "Sign in", onClick: goToSignIn },
+        });
+        return;
+      }
       toast.error(error.message);
       return;
     }
+
+    // Supabase's documented signal for "this email is already a confirmed
+    // account": with email confirmations on, signUp() doesn't error (to
+    // avoid leaking which emails exist) but returns an empty identities
+    // array instead of creating a new identity.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      toast.error("An account with this email already exists.", {
+        action: { label: "Sign in", onClick: goToSignIn },
+      });
+      return;
+    }
+
     if (data.session) {
       toast.success("Account created — welcome to MD Attire");
       navigate({ to: redirect || "/account" });
       return;
     }
     toast.success("Check your inbox to confirm your email, then sign in.");
-    navigate({ to: "/login", search: { redirect } });
+    goToSignIn();
   }
 
   return (
@@ -79,7 +111,7 @@ function Signup() {
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" search={{ redirect }} className="underline-sweep text-foreground">
+        <Link to="/login" search={{ redirect, email }} className="underline-sweep text-foreground">
           Sign in
         </Link>
       </p>
